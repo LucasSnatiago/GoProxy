@@ -9,9 +9,14 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackwakefield/gopac"
+)
+
+var (
+	vmLock sync.Mutex
 )
 
 func handleHTTP(conn net.Conn, pacparser *gopac.Parser) {
@@ -31,23 +36,22 @@ func handleHTTP(conn net.Conn, pacparser *gopac.Parser) {
 	}
 }
 
-func HttpHandleProxy(req *http.Request, pacparser *gopac.Parser) (*url.URL, error) {
-	entry, ok := pacCache.Get(req.Host)
+func HttpHandleProxy(host string, pacparser *gopac.Parser) (*url.URL, error) {
+	entry, ok := pacCache.Get(host)
 
 	if !ok {
-		pacrequest, err := pacparser.FindProxy("", req.Host)
+		vmLock.Lock()
+		defer vmLock.Unlock()
+		pacrequest, err := pacparser.FindProxy("", host)
 		if err != nil {
-			log.Fatalf("Failed to find proxy entry (%s)", err)
+			log.Printf("Failed to find proxy entry (%s)", err)
 		}
 
 		entry = pacrequest
-		pacCache.Add(req.Host, pacrequest)
+		pacCache.Add(host, pacrequest)
 	}
 
 	proxyFields := strings.Fields(entry)
-	if len(proxyFields) < 2 {
-		return nil, fmt.Errorf("invalid proxy entry: %s", entry)
-	}
 
 	switch strings.ToUpper(proxyFields[0]) {
 	case "PROXY":
@@ -66,7 +70,7 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *gopac.Parser
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
-	proxyURL, err := HttpHandleProxy(req, pacparser)
+	proxyURL, err := HttpHandleProxy(req.Host, pacparser)
 	if err != nil {
 		log.Printf("Failed to resolve proxy for %s: %v", req.URL, err)
 		writeHTTPError(client, http.StatusBadGateway, "Bad Gateway")
@@ -83,7 +87,7 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *gopac.Parser
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: func(r *http.Request) (*url.URL, error) {
-				proxyURL, err := HttpHandleProxy(r, pacparser)
+				proxyURL, err := HttpHandleProxy(r.Host, pacparser)
 				if err != nil {
 					log.Printf("PAC resolution error for %s: %v", r.URL.Host, err)
 				} else if proxyURL != nil {
@@ -124,7 +128,7 @@ func handleHTTPS(client net.Conn, target string, pacparser *gopac.Parser) {
 	}
 	rawUrl := strings.Split(rawUrlWithPort.String(), ":")[0]
 
-	proxyURL, err := pacparser.FindProxy("", rawUrl)
+	proxyURL, err := HttpHandleProxy(rawUrl, pacparser)
 
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)
@@ -133,9 +137,8 @@ func handleHTTPS(client net.Conn, target string, pacparser *gopac.Parser) {
 
 	var server net.Conn
 
-	if strings.HasPrefix(proxyURL, "PROXY") {
-		targetProxyIp := strings.Split(proxyURL, " ")[1]
-		server, err = net.Dial("tcp", targetProxyIp)
+	if proxyURL != nil {
+		server, err = net.Dial("tcp", proxyURL.Host)
 		if err != nil {
 			log.Println("Fail to connect to proxy for HTTPS:", err)
 			return
