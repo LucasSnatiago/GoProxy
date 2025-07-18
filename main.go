@@ -16,8 +16,8 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	listenAddr := flag.String("l", "localhost", "ip to listen on")
-	httpPort := flag.Int("p", 8558, "HTTP/HTTPS port to listen on")
-	socksPort := flag.Int("s", 9089, "SOCKS5 port to listen on")
+	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
+	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
 	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
 	flag.Parse()
 
