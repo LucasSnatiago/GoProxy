@@ -24,17 +24,24 @@ func handleHTTP(conn net.Conn, pacparser *gopac.Parser) {
 		return
 	}
 
-	if strings.Compare(req.Method, "CONNECT") == 0 {
-		handleHTTPS(conn, reader, req.Host)
+	if req.Method == "CONNECT" {
+		handleHTTPS(conn, req.Host, pacparser)
 	} else {
 		handlePlainHTTP(conn, req, pacparser)
 	}
 }
 
 func HttpHandleProxy(req *http.Request, pacparser *gopac.Parser) (*url.URL, error) {
-	entry, err := pacparser.FindProxy("", req.Host)
-	if err != nil {
-		log.Fatalf("Failed to find proxy entry (%s)", err)
+	entry, ok := pacCache.Get(req.Host)
+
+	if !ok {
+		pacrequest, err := pacparser.FindProxy("", req.Host)
+		if err != nil {
+			log.Fatalf("Failed to find proxy entry (%s)", err)
+		}
+
+		entry = pacrequest
+		pacCache.Add(req.Host, pacrequest)
 	}
 
 	proxyFields := strings.Fields(entry)
@@ -55,59 +62,120 @@ func HttpHandleProxy(req *http.Request, pacparser *gopac.Parser) (*url.URL, erro
 }
 
 func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *gopac.Parser) {
-	defer client.Close()
-
 	req.RequestURI = ""
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
 	proxyURL, err := HttpHandleProxy(req, pacparser)
 	if err != nil {
-		log.Println("Failed to resolve proxy:", err)
+		log.Printf("Failed to resolve proxy for %s: %v", req.URL, err)
+		writeHTTPError(client, http.StatusBadGateway, "Bad Gateway")
 		return
 	}
 
 	if proxyURL != nil {
-		log.Printf("%s was accessed through proxy: %s\n", req.URL.String(), proxyURL.Host)
+		log.Printf("%s was accessed through proxy: %s", req.URL, proxyURL.Host)
 	} else {
-		log.Printf("%s was directly accessed (DIRECT)\n", req.URL.String())
-	}
-
-	transport := &http.Transport{
-		Proxy: func(r *http.Request) (*url.URL, error) {
-			return proxyURL, nil
-		},
+		log.Printf("%s was directly accessed (DIRECT)", req.URL)
 	}
 
 	clientHTTP := &http.Client{
-		Timeout:   30 * time.Second,
-		Transport: transport,
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy: func(r *http.Request) (*url.URL, error) {
+				proxyURL, err := HttpHandleProxy(r, pacparser)
+				if err != nil {
+					log.Printf("PAC resolution error for %s: %v", r.URL.Host, err)
+				} else if proxyURL != nil {
+					log.Printf("%s accessed through proxy: %s", r.URL.String(), proxyURL.Host)
+				} else {
+					log.Printf("%s accessed directly (DIRECT)", r.URL.String())
+				}
+				return proxyURL, err
+			},
+			DisableKeepAlives: true,
+		},
 	}
 
 	resp, err := clientHTTP.Do(req)
 	if err != nil {
-		log.Println("Failed to send request through proxy:", err)
+		log.Printf("Failed to send request to %s: %v", req.URL, err)
+		writeHTTPError(client, http.StatusBadGateway, "Bad Gateway")
 		return
 	}
 	defer resp.Body.Close()
 
-	err = resp.Write(client)
-	if err != nil {
-		log.Println("Fail to write answer:", err)
-		return
+	if err := resp.Write(client); err != nil {
+		log.Printf("Failed to write response for %s: %v", req.URL, err)
 	}
 }
 
-func handleHTTPS(client net.Conn, reader *bufio.Reader, target string) {
-	server, err := net.Dial("tcp", target)
+func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
+	body := fmt.Sprintf("%d %s", statusCode, statusText)
+	fmt.Fprintf(conn,
+		"HTTP/1.1 %d %s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
+		statusCode, statusText, len(body), body)
+}
+
+func handleHTTPS(client net.Conn, target string, pacparser *gopac.Parser) {
+	rawUrlWithPort, err := url.Parse(target)
 	if err != nil {
-		log.Println("Fail to connet to target HTTPS:", err)
+		log.Println("failed to parse HTTPS url", err)
+	}
+	rawUrl := strings.Split(rawUrlWithPort.String(), ":")[0]
+
+	proxyURL, err := pacparser.FindProxy("", rawUrl)
+
+	if err != nil {
+		log.Println("Failed to resolve proxy (HTTPS):", err)
 		return
 	}
 
+	var server net.Conn
+
+	if strings.HasPrefix(proxyURL, "PROXY") {
+		targetProxyIp := strings.Split(proxyURL, " ")[1]
+		server, err = net.Dial("tcp", targetProxyIp)
+		if err != nil {
+			log.Println("Fail to connect to proxy for HTTPS:", err)
+			return
+		}
+
+		connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", target, target)
+		if _, err := server.Write([]byte(connectReq)); err != nil {
+			log.Println("Failed to write CONNECT to proxy:", err)
+			server.Close()
+			return
+		}
+
+		br := bufio.NewReader(server)
+		status, err := br.ReadString('\n')
+		if err != nil || !strings.Contains(status, "200") {
+			log.Println("Proxy refused CONNECT:", status)
+			server.Close()
+			return
+		}
+
+		for {
+			line, err := br.ReadString('\n')
+			if err != nil || line == "\r\n" {
+				break
+			}
+		}
+		log.Printf("%s was securely accessed through proxy: %s\n", target, proxyURL)
+	} else {
+		server, err = net.Dial("tcp", target)
+		if err != nil {
+			log.Println("Fail to connect directly for HTTPS:", err)
+			return
+		}
+		log.Printf("%s was securely accessed directly (DIRECT)\n", target)
+	}
+
+	defer server.Close()
+
 	fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
 
-	log.Printf("%s was securely accessed through proxy: %s\n", target, client.RemoteAddr().String())
-	go io.Copy(server, reader)
+	go io.Copy(server, client)
 	io.Copy(client, server)
 }
