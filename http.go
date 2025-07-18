@@ -11,15 +11,13 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/jackwakefield/gopac"
 )
 
 var (
 	vmLock sync.Mutex
 )
 
-func handleHTTP(conn net.Conn, pacparser *gopac.Parser) {
+func handleHTTP(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -30,25 +28,26 @@ func handleHTTP(conn net.Conn, pacparser *gopac.Parser) {
 	}
 
 	if req.Method == "CONNECT" {
-		handleHTTPS(conn, req.Host, pacparser)
+		handleHTTPS(conn, req)
 	} else {
-		handlePlainHTTP(conn, req, pacparser)
+		handlePlainHTTP(conn, req)
 	}
 }
 
-func HttpHandleProxy(host string, pacparser *gopac.Parser) (*url.URL, error) {
+func HttpHandleProxy(rawUrl string) (*url.URL, error) {
+	host := strings.Split(rawUrl, ":")[1]
 	entry, ok := pacCache.Get(host)
 
 	if !ok {
 		vmLock.Lock()
-		defer vmLock.Unlock()
-		pacrequest, err := pacparser.FindProxy("", host)
+		pacrequest, err := pacparser.FindProxy(rawUrl, host)
 		if err != nil {
 			log.Printf("Failed to find proxy entry (%s)", err)
 		}
 
 		entry = pacrequest
 		pacCache.Add(host, pacrequest)
+		vmLock.Unlock()
 	}
 
 	proxyFields := strings.Fields(entry)
@@ -65,35 +64,22 @@ func HttpHandleProxy(host string, pacparser *gopac.Parser) (*url.URL, error) {
 	}
 }
 
-func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *gopac.Parser) {
+func handlePlainHTTP(client net.Conn, req *http.Request) {
 	req.RequestURI = ""
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
-
-	proxyURL, err := HttpHandleProxy(req.Host, pacparser)
-	if err != nil {
-		log.Printf("Failed to resolve proxy for %s: %v", req.URL, err)
-		writeHTTPError(client, http.StatusBadGateway, "Bad Gateway")
-		return
-	}
-
-	if proxyURL != nil {
-		log.Printf("%s was accessed through proxy: %s", req.URL, proxyURL.Host)
-	} else {
-		log.Printf("%s was directly accessed (DIRECT)", req.URL)
-	}
 
 	clientHTTP := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: func(r *http.Request) (*url.URL, error) {
-				proxyURL, err := HttpHandleProxy(r.Host, pacparser)
+				proxyURL, err := HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
 				if err != nil {
-					log.Printf("PAC resolution error for %s: %v", r.URL.Host, err)
+					log.Printf("PAC resolution error for %s: %v", r.Host, err)
 				} else if proxyURL != nil {
-					log.Printf("%s accessed through proxy: %s", r.URL.String(), proxyURL.Host)
+					log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
 				} else {
-					log.Printf("%s accessed directly (DIRECT)", r.URL.String())
+					log.Printf("%s accessed directly (DIRECT)", r.Host)
 				}
 				return proxyURL, err
 			},
@@ -121,14 +107,9 @@ func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
 		statusCode, statusText, len(body), body)
 }
 
-func handleHTTPS(client net.Conn, target string, pacparser *gopac.Parser) {
-	rawUrlWithPort, err := url.Parse(target)
-	if err != nil {
-		log.Println("failed to parse HTTPS url", err)
-	}
-	rawUrl := strings.Split(rawUrlWithPort.String(), ":")[0]
-
-	proxyURL, err := HttpHandleProxy(rawUrl, pacparser)
+func handleHTTPS(client net.Conn, req *http.Request) {
+	target := req.Host
+	proxyURL, err := HttpHandleProxy(fmt.Sprintf("https:%s", req.URL))
 
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)

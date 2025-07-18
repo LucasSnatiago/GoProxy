@@ -3,50 +3,49 @@ package main
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
-	"strings"
+	"net/http"
+	"time"
 )
 
 // Get network package from socks and transform it in a http proxy package
-func httpConnectDialer(proxyHTTPAddr string) func(ctx context.Context, network, addr string) (net.Conn, error) {
+func httpConnectDialer(proxyHTTPAddr string, dialTimeout time.Duration) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	d := &net.Dialer{
+		Timeout: dialTimeout,
+	}
+
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		conn, err := net.Dial(network, proxyHTTPAddr)
+		conn, err := d.DialContext(ctx, network, proxyHTTPAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, addr)
-		if _, err := conn.Write([]byte(connectReq)); err != nil {
-			conn.Close()
-			return nil, err
+		if dl, ok := ctx.Deadline(); ok {
+			conn.SetDeadline(dl)
 		}
+
+		fmt.Fprintf(conn,
+			"CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+			addr, addr,
+		)
 
 		br := bufio.NewReader(conn)
-		status, err := br.ReadString('\n')
+		resp, err := http.ReadResponse(br, &http.Request{Method: http.MethodConnect})
 		if err != nil {
 			conn.Close()
-			return nil, err
+			return nil, fmt.Errorf("failed to read CONNECT response: %w", err)
 		}
-		if !strings.HasPrefix(status, "HTTP/1.1 200") {
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
 			conn.Close()
-			return nil, errors.New("proxy HTTP rejected CONNECT: " + strings.TrimSpace(status))
+			return nil, fmt.Errorf("proxy rejected CONNECT: %s", resp.Status)
 		}
 
-		for {
-			line, err := br.ReadString('\n')
-			if err != nil {
-				conn.Close()
-				return nil, err
-			}
-			if line == "\r\n" {
-				break
-			}
-		}
-
-		log.Println("SOCKS5 proxy: ", addr)
+		conn.SetDeadline(time.Time{})
+		log.Printf("HTTP CONNECT tunnel established to %s via %s", addr, proxyHTTPAddr)
 		return conn, nil
 	}
 }
