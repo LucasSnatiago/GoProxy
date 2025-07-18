@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -24,7 +25,13 @@ func main() {
 	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
 	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
 	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
+	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
 	flag.Parse()
+
+	// Disabling log messages
+	if !*logMessages {
+		log.SetOutput(io.Discard)
+	}
 
 	// Proxy Auto Config
 	pacparser = new(gopac.Parser)
