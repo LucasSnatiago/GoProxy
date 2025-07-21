@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -11,13 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/LucasSnatiago/GoProxy/pac"
 	"github.com/armon/go-socks5"
-	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/jackwakefield/gopac"
 )
-
-var pacCache *expirable.LRU[string, string]
-var pacparser *gopac.Parser
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
@@ -25,6 +22,7 @@ func main() {
 	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
 	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
 	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
+	ttlSeconds := flag.Int64("S", int64(time.Minute)*5, "sets how long (in seconds) for the cache to keep the entries")
 	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
 	flag.Parse()
 
@@ -33,19 +31,24 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
-	// Proxy Auto Config
-	pacparser = new(gopac.Parser)
-
-	// Cache to avoid accessing the js vm
-	pacCache = expirable.NewLRU[string, string](10000, nil, time.Minute*5)
-
+	// Pac file is mandatory
 	if pacUrl == nil || *pacUrl == "" {
 		fmt.Println("Please specify pac url using -C")
 		os.Exit(1)
 	}
 
-	if err := pacparser.ParseUrl(*pacUrl); err != nil {
+	ctx := context.Background()
+
+	// Proxy Auto Config
+	pacScript, err := pac.DownloadPAC(ctx, *pacUrl)
+	if err != nil {
 		log.Fatalf("Failed to parse PAC (%s)", err)
+
+	}
+
+	pacparser, err := pac.NewPac(pacScript, time.Duration(*ttlSeconds))
+	if err != nil {
+		log.Fatalln("Failed to create pac parser: ", err)
 	}
 
 	httpAddr := net.JoinHostPort(*listenAddr, fmt.Sprint(*httpPort))
@@ -63,7 +66,7 @@ func main() {
 				continue
 			}
 
-			go handleHTTP(conn)
+			go handleHTTP(conn, pacparser)
 		}
 	}()
 

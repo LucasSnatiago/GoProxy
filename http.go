@@ -9,15 +9,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-var (
-	vmLock sync.Mutex
-)
-
-func handleHTTP(conn net.Conn) {
+func handleHTTP(conn net.Conn, pacparser *pac.Pac) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -28,43 +25,13 @@ func handleHTTP(conn net.Conn) {
 	}
 
 	if req.Method == "CONNECT" {
-		handleHTTPS(conn, req)
+		handleHTTPS(conn, req, pacparser)
 	} else {
-		handlePlainHTTP(conn, req)
+		handlePlainHTTP(conn, req, pacparser)
 	}
 }
 
-func HttpHandleProxy(rawUrl string) (*url.URL, error) {
-	host := strings.Split(rawUrl, ":")[1]
-	entry, ok := pacCache.Get(host)
-
-	if !ok {
-		vmLock.Lock()
-		pacrequest, err := pacparser.FindProxy(rawUrl, host)
-		if err != nil {
-			log.Printf("Failed to find proxy entry (%s)", err)
-		}
-
-		entry = pacrequest
-		pacCache.Add(host, pacrequest)
-		vmLock.Unlock()
-	}
-
-	proxyFields := strings.Fields(entry)
-
-	switch strings.ToUpper(proxyFields[0]) {
-	case "PROXY":
-		return url.Parse("http://" + proxyFields[1])
-	case "SOCKS", "SOCKS5":
-		return url.Parse("socks5://" + proxyFields[1])
-	case "DIRECT":
-		return nil, nil // no proxy
-	default:
-		return nil, fmt.Errorf("unsupported proxy type: %s", proxyFields[0])
-	}
-}
-
-func handlePlainHTTP(client net.Conn, req *http.Request) {
+func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 	req.RequestURI = ""
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
@@ -73,7 +40,7 @@ func handlePlainHTTP(client net.Conn, req *http.Request) {
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: func(r *http.Request) (*url.URL, error) {
-				proxyURL, err := HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
+				proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
 				if err != nil {
 					log.Printf("PAC resolution error for %s: %v", r.Host, err)
 				} else if proxyURL != nil {
@@ -107,9 +74,9 @@ func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
 		statusCode, statusText, len(body), body)
 }
 
-func handleHTTPS(client net.Conn, req *http.Request) {
+func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 	target := req.Host
-	proxyURL, err := HttpHandleProxy(fmt.Sprintf("https:%s", req.URL))
+	proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("https:%s", req.URL))
 
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)
