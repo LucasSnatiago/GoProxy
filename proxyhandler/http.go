@@ -36,21 +36,23 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
-	clientHTTP := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			Proxy: func(r *http.Request) (*url.URL, error) {
-				proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
-				if err != nil {
-					log.Printf("PAC resolution error for %s: %v", r.Host, err)
-				} else if proxyURL != nil {
-					log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
-				} else {
-					log.Printf("%s accessed directly (DIRECT)", r.Host)
-				}
-				return proxyURL, err
-			},
+	trnprt := &http.Transport{
+		Proxy: func(r *http.Request) (*url.URL, error) {
+			proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
+			if err != nil {
+				log.Printf("PAC resolution error for %s: %v", r.Host, err)
+			} else if proxyURL != nil {
+				log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
+			} else {
+				log.Printf("%s accessed directly (DIRECT)", r.Host)
+			}
+			return proxyURL, err
 		},
+	}
+
+	clientHTTP := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: trnprt,
 	}
 
 	resp, err := clientHTTP.Do(req)
@@ -83,9 +85,8 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 	}
 
 	var server net.Conn
-
 	if proxyURL != nil {
-		server, err = net.Dial("tcp", proxyURL.Host)
+		server, err = net.DialTimeout("tcp", proxyURL.Host, time.Second*30)
 		if err != nil {
 			log.Println("Fail to connect to proxy for HTTPS:", err)
 			return
@@ -104,7 +105,8 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 			log.Printf("Proxy refused CONNECT: %s. Trying DIRECT!", status)
 
 			// --- Experimental support for wrong proxy configs
-			server, err = net.Dial("tcp", target)
+			server.Close()
+			server, err = net.DialTimeout("tcp", target, time.Second*30)
 			if err != nil {
 				log.Println("DIRECT failed as well:", err)
 				return
@@ -115,8 +117,17 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 
 			fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
 
-			go io.Copy(server, client)
-			io.Copy(client, server)
+			done := make(chan struct{}, 2)
+			go func() {
+				io.Copy(server, client)
+				done <- struct{}{}
+			}()
+			go func() {
+				io.Copy(client, server)
+				done <- struct{}{}
+			}()
+			<-done
+
 			return
 
 			// --- Better to find a way thats easier to write this recover part
@@ -130,18 +141,25 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 		}
 		log.Printf("%s was securely accessed through proxy: %s\n", target, proxyURL)
 	} else {
-		server, err = net.Dial("tcp", target)
+		server, err = net.DialTimeout("tcp", target, time.Second*30)
 		if err != nil {
 			log.Println("Fail to connect directly for HTTPS:", err)
 			return
 		}
+		defer server.Close()
 		log.Printf("%s was securely accessed directly (DIRECT)\n", target)
 	}
 
-	defer server.Close()
-
 	fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
 
-	go io.Copy(server, client)
-	io.Copy(client, server)
+	done := make(chan struct{}, 2)
+	go func() {
+		io.Copy(server, client)
+		done <- struct{}{}
+	}()
+	go func() {
+		io.Copy(client, server)
+		done <- struct{}{}
+	}()
+	<-done
 }

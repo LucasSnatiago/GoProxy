@@ -30,7 +30,7 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	}
 
 	return &Pac{
-		PacCache: expirable.NewLRU[string, string](1000, nil, ttl),
+		PacCache: expirable.NewLRU[string, string](10000, nil, ttl), // Caching 10k most recent sites
 		Pool:     &vmPool,
 	}, nil
 }
