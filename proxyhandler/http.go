@@ -101,9 +101,25 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 		br := bufio.NewReader(server)
 		status, err := br.ReadString('\n')
 		if err != nil || !strings.Contains(status, "200") {
-			log.Println("Proxy refused CONNECT:", status)
-			server.Close()
+			log.Printf("Proxy refused CONNECT: %s. Trying DIRECT!", status)
+
+			// --- Experimental support for wrong proxy configs
+			server, err = net.Dial("tcp", target)
+			if err != nil {
+				log.Println("DIRECT failed as well:", err)
+				return
+			}
+			log.Printf("%s was securely accessed directly (DIRECT)\n", target)
+
+			defer server.Close()
+
+			fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
+
+			go io.Copy(server, client)
+			io.Copy(client, server)
 			return
+
+			// --- Better to find a way thats easier to write this recover part
 		}
 
 		for {
