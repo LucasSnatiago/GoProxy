@@ -50,7 +50,6 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 				}
 				return proxyURL, err
 			},
-			DisableKeepAlives: true,
 		},
 	}
 

@@ -18,7 +18,7 @@ type Pac struct {
 }
 
 func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
-	vmPool := &sync.Pool{
+	vmPool := sync.Pool{
 		New: func() any {
 			vm := new(gopac.Parser)
 
@@ -30,8 +30,8 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	}
 
 	return &Pac{
-		PacCache: expirable.NewLRU[string, string](100000, nil, ttl),
-		Pool:     vmPool,
+		PacCache: expirable.NewLRU[string, string](1000, nil, ttl),
+		Pool:     &vmPool,
 	}, nil
 }
 
