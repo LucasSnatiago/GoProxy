@@ -57,7 +57,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Proxy HTTP listening on ", httpAddr)
+	fmt.Println("Proxy HTTP listening on", httpAddr)
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -72,7 +72,7 @@ func main() {
 
 	// Socks5
 	socks5addr := net.JoinHostPort(*listenAddr, fmt.Sprint(*socksPort))
-	log.Println("Proxy SOCKS5 listening on ", socks5addr)
+	fmt.Println("Proxy SOCKS5 listening on", socks5addr)
 	go func() {
 		conf := &socks5.Config{
 			Dial:   httpConnectDialer(httpAddr, time.Second*30),
@@ -91,7 +91,7 @@ func main() {
 	// Use CTRL + C to stop process
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	log.Println("Program running. Press Ctrl+C to stop.")
+	fmt.Println("Program running. Press Ctrl+C to stop.")
 	<-sigChan
 	fmt.Println("Received Ctrl+C. Turning off...")
 }
