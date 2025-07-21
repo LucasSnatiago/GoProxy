@@ -1,4 +1,4 @@
-package main
+package proxyhandler
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ import (
 )
 
 // Get network package from socks and transform it in a http proxy package
-func httpConnectDialer(proxyHTTPAddr string, dialTimeout time.Duration) func(ctx context.Context, network, addr string) (net.Conn, error) {
+func HttpConnectDialer(proxyHTTPAddr string, dialTimeout time.Duration) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	d := &net.Dialer{
 		Timeout: dialTimeout,
 	}

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/LucasSnatiago/GoProxy/pac"
+	"github.com/LucasSnatiago/GoProxy/proxyhandler"
 	"github.com/armon/go-socks5"
 )
 
@@ -42,19 +43,21 @@ func main() {
 	// Proxy Auto Config
 	pacScript, err := pac.DownloadPAC(ctx, *pacUrl)
 	if err != nil {
-		log.Fatalf("Failed to parse PAC (%s)", err)
-
+		fmt.Println("Failed to parse PAC:", err)
+		os.Exit(2)
 	}
 
 	pacparser, err := pac.NewPac(pacScript, time.Duration(*ttlSeconds))
 	if err != nil {
-		log.Fatalln("Failed to create pac parser: ", err)
+		fmt.Println("Failed to create pac parser:", err)
+		os.Exit(3)
 	}
 
 	httpAddr := net.JoinHostPort(*listenAddr, fmt.Sprint(*httpPort))
 	ln, err := net.Listen("tcp", httpAddr)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Failed to start http proxy:", err)
+		os.Exit(4)
 	}
 
 	fmt.Println("Proxy HTTP listening on", httpAddr)
@@ -66,25 +69,26 @@ func main() {
 				continue
 			}
 
-			go handleHTTP(conn, pacparser)
+			go proxyhandler.HandleHTTP(conn, pacparser)
 		}
 	}()
 
 	// Socks5
 	socks5addr := net.JoinHostPort(*listenAddr, fmt.Sprint(*socksPort))
-	fmt.Println("Proxy SOCKS5 listening on", socks5addr)
 	go func() {
 		conf := &socks5.Config{
-			Dial:   httpConnectDialer(httpAddr, time.Second*30),
+			Dial:   proxyhandler.HttpConnectDialer(httpAddr, time.Second*30),
 			Logger: log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags),
 		}
 		server, err := socks5.New(conf)
 		if err != nil {
-			panic(err)
+			fmt.Println("Failed to create socks5 object:", err)
 		}
 
-		if err := server.ListenAndServe("tcp", socks5addr); err != nil {
-			log.Println("Failed to start socks5 server:", err)
+		fmt.Println("Proxy SOCKS5 listening on", socks5addr)
+		err = server.ListenAndServe("tcp", socks5addr)
+		if err != nil {
+			fmt.Println("failed to start socks5 server:", err)
 		}
 	}()
 

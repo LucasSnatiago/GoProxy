@@ -1,4 +1,4 @@
-package main
+package proxyhandler
 
 import (
 	"bufio"
@@ -14,7 +14,7 @@ import (
 	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-func handleHTTP(conn net.Conn, pacparser *pac.Pac) {
+func HandleHTTP(conn net.Conn, pacparser *pac.Pac) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
