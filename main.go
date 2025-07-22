@@ -14,7 +14,7 @@ import (
 
 	"github.com/LucasSnatiago/GoProxy/pac"
 	"github.com/LucasSnatiago/GoProxy/proxyhandler"
-	"github.com/armon/go-socks5"
+	"github.com/things-go/go-socks5"
 )
 
 func main() {
@@ -76,14 +76,10 @@ func main() {
 	// Socks5
 	socks5addr := net.JoinHostPort(*listenAddr, fmt.Sprint(*socksPort))
 	go func() {
-		conf := &socks5.Config{
-			Dial:   proxyhandler.HttpConnectDialer(httpAddr, time.Second*30),
-			Logger: log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags),
-		}
-		server, err := socks5.New(conf)
-		if err != nil {
-			fmt.Println("Failed to create socks5 object:", err)
-		}
+		server := socks5.NewServer(
+			socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags))),
+			socks5.WithDial(proxyhandler.HttpConnectDialer(httpAddr, time.Second*30)),
+		)
 
 		fmt.Println("Proxy SOCKS5 listening on", socks5addr)
 		err = server.ListenAndServe("tcp", socks5addr)

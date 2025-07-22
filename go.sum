@@ -9,6 +9,8 @@ github.com/jackwakefield/gopac v1.0.2 h1:TdHTGtC/kMc5kyYw7PEO5kqAHxcpuU4RFY4ztfg
 github.com/jackwakefield/gopac v1.0.2/go.mod h1:yR1sfJXcndScUFYPx7Xqxj7bkNlCWw9AMmuJFMHLXm8=
 github.com/robertkrimen/otto v0.5.1 h1:avDI4ToRk8k1hppLdYFTuuzND41n37vPGJU7547dGf0=
 github.com/robertkrimen/otto v0.5.1/go.mod h1:bS433I4Q9p+E5pZLu7r17vP6FkE6/wLxBdmKjoqJXF8=
+github.com/things-go/go-socks5 v0.0.6 h1:YjylIYZiND41szH4NzsVbx8aVDsS/Y8ps3QYPwQvqnI=
+github.com/things-go/go-socks5 v0.0.6/go.mod h1:RF6tRutwNWzISbPfiDEChH/o1aDfRv+cXDYn2a2qkK4=
 golang.org/x/net v0.42.0 h1:jzkYrhi3YQWD6MLBJcsklgQsoAcw89EcZbJw8Z614hs=
 golang.org/x/net v0.42.0/go.mod h1:FF1RA5d3u7nAYA4z2TkclSCKh68eSXtiFwcWQpPXdt8=
 golang.org/x/text v0.4.0 h1:BrVqGRd7+k1DiOgtnFvAkoQEWQvBc25ouMJM6429SFg=
