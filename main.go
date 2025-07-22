@@ -23,7 +23,7 @@ func main() {
 	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
 	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
 	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
-	ttlSeconds := flag.Int64("S", int64(time.Minute*5), "sets how long (in seconds) for the cache to keep the entries")
+	ttlSeconds := flag.Int64("S", 5*60, "sets how long (in seconds) for the cache to keep the entries - default is 5 minutes")
 	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
 	flag.Parse()
 
