@@ -1,31 +1,10 @@
 package pac
 
 import (
-	"fmt"
 	"log"
-	"net/url"
-	"strings"
 
 	"github.com/jackwakefield/gopac"
 )
-
-func (p *Pac) HttpHandleProxy(rawUrl string) (*url.URL, error) {
-	host := strings.Split(rawUrl, ":")[1]
-	entry := p.getFromCache(rawUrl, host)
-
-	proxyFields := strings.Fields(entry)
-
-	switch strings.ToUpper(proxyFields[0]) {
-	case "PROXY":
-		return url.Parse("http://" + proxyFields[1])
-	case "SOCKS", "SOCKS5":
-		return url.Parse("socks5://" + proxyFields[1])
-	case "DIRECT":
-		return nil, nil // no proxy
-	default:
-		return nil, fmt.Errorf("unsupported proxy type: %s", proxyFields[0])
-	}
-}
 
 // It tries to retrieve the URL from the cache if it fails it calls an OttoVM
 // and retrieves the url directly from the proxy

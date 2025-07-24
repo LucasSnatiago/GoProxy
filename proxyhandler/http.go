@@ -3,7 +3,6 @@ package proxyhandler
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -38,16 +37,19 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 
 	trnprt := &http.Transport{
 		Proxy: func(r *http.Request) (*url.URL, error) {
-			proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
-			if err != nil {
-				log.Printf("PAC resolution error for %s: %v", r.Host, err)
-			} else if proxyURL != nil {
-				log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
-			} else {
-				log.Printf("%s accessed directly (DIRECT)", r.Host)
-			}
-			return proxyURL, err
+			return pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", req.Host))
 		},
+		//Proxy: func(r *http.Request) (*url.URL, error) {
+		//	proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
+		//	if err != nil {
+		//		log.Printf("PAC resolution error for %s: %v", r.Host, err)
+		//	} else if proxyURL != nil {
+		//		log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
+		//	} else {
+		//		log.Printf("%s accessed directly (DIRECT)", r.Host)
+		//	}
+		//	return proxyURL, err
+		//},
 	}
 
 	clientHTTP := &http.Client{
@@ -76,90 +78,39 @@ func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
 }
 
 func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
-	target := req.Host
 	proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("https:%s", req.URL))
-
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)
 		return
 	}
 
-	var server net.Conn
-	if proxyURL != nil {
-		server, err = net.DialTimeout("tcp", proxyURL.Host, time.Second*30)
-		if err != nil {
-			log.Println("Fail to connect to proxy for HTTPS:", err)
-			return
-		}
-
-		connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", target, target)
-		if _, err := server.Write([]byte(connectReq)); err != nil {
-			log.Println("Failed to write CONNECT to proxy:", err)
-			server.Close()
-			return
-		}
-
-		br := bufio.NewReader(server)
-		status, err := br.ReadString('\n')
-		if err != nil || !strings.Contains(status, "200") {
-			log.Printf("Proxy refused CONNECT: %s. Trying DIRECT!", status)
-
-			// --- Experimental support for wrong proxy configs
-			server.Close()
-			server, err = net.DialTimeout("tcp", target, time.Second*30)
-			if err != nil {
-				log.Println("DIRECT failed as well:", err)
-				return
-			}
-			log.Printf("%s was securely accessed directly (DIRECT)\n", target)
-
-			defer server.Close()
-
-			fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
-
-			done := make(chan struct{}, 2)
-			go func() {
-				io.Copy(server, client)
-				done <- struct{}{}
-			}()
-			go func() {
-				io.Copy(client, server)
-				done <- struct{}{}
-			}()
-			<-done
-
-			return
-
-			// --- Better to find a way thats easier to write this recover part
-		}
-
-		for {
-			line, err := br.ReadString('\n')
-			if err != nil || line == "\r\n" {
-				break
-			}
-		}
-		log.Printf("%s was securely accessed through proxy: %s\n", target, proxyURL)
-	} else {
-		server, err = net.DialTimeout("tcp", target, time.Second*30)
-		if err != nil {
-			log.Println("Fail to connect directly for HTTPS:", err)
-			return
-		}
-		defer server.Close()
-		log.Printf("%s was securely accessed directly (DIRECT)\n", target)
+	target := req.Host
+	if proxyURL == nil {
+		doDirectRequest(client, target)
+		return
 	}
 
-	fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
+	server, err := doProxyRequest(proxyURL, target)
+	if err != nil {
+		log.Println("Failed to connect to proxy for HTTPS:", err)
+		return
+	}
+	defer server.Close()
 
-	done := make(chan struct{}, 2)
-	go func() {
-		io.Copy(server, client)
-		done <- struct{}{}
-	}()
-	go func() {
-		io.Copy(client, server)
-		done <- struct{}{}
-	}()
-	<-done
+	br := bufio.NewReader(server)
+	status, err := br.ReadString('\n')
+	if err != nil || !strings.Contains(status, "200") {
+		log.Printf("Proxy refused CONNECT: %s. Trying DIRECT!", status)
+
+		// --- Experimental support for wrong configured proxies
+		doDirectRequest(client, target)
+		return
+	}
+
+	for {
+		line, err := br.ReadString('\n')
+		if err != nil || line == "\r\n" {
+			break
+		}
+	}
 }
