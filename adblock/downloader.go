@@ -1,4 +1,4 @@
-package pac
+package adblock
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func getBytesFromURL(proxyAddr, hostsURL string) ([]byte, error) {
+func GetBytesFromURL(proxyAddr, hostsURL string) ([]byte, error) {
 	proxyURL, err := url.Parse(proxyAddr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid proxy: %w", err)
@@ -21,6 +21,7 @@ func getBytesFromURL(proxyAddr, hostsURL string) ([]byte, error) {
 
 	client := &http.Client{
 		Transport: transport,
+		Timeout:   time.Second * 30,
 	}
 	resp, err := client.Get(hostsURL)
 	if err != nil {

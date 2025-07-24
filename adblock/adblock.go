@@ -1,4 +1,4 @@
-package pac
+package adblock
 
 import (
 	"bufio"
@@ -13,7 +13,7 @@ type AdBlock struct {
 }
 
 func DownloadStevensBlackBlackList(proxyurl string) *AdBlock {
-	data, err := getBytesFromURL(proxyurl, "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts")
+	data, err := GetBytesFromURL(proxyurl, "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts")
 	if err != nil || len(data) == 0 {
 		log.Printf("Failed to download Stevens Black List: %v\nTurning adblock off", err)
 	}
