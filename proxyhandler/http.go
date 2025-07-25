@@ -11,47 +11,62 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LucasSnatiago/GoProxy/adblock"
 	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-func HandleHTTP(conn net.Conn, pacparser *pac.Pac) {
+type ProxyHandler struct {
+	PacParser *pac.Pac
+	Adblocker *adblock.AdBlocker
+}
+
+func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.AdBlocker) {
 	defer conn.Close()
+
+	proxyHandler := &ProxyHandler{
+		PacParser: pacparser,
+		Adblocker: adblock,
+	}
 
 	reader := bufio.NewReader(conn)
 	req, err := http.ReadRequest(reader)
 	if err != nil {
-		log.Println("Fail to read request:", err)
+		if err != io.EOF {
+			log.Println("Fail to read request:", err)
+		}
 		return
 	}
 
-	if req.Method == "CONNECT" {
-		handleHTTPS(conn, req, pacparser)
+	if proxyHandler.Adblocker != nil {
+		// Drop connection if the host appears on the adblock list
+		host := strings.Split(req.Host, ":")
+		if proxyHandler.Adblocker.CheckIfAppearsOnAdblockList(host[0]) {
+			log.Printf("Blocked request to %s due to adblock rules", req.Host)
+			writeHTTPError(conn, http.StatusForbidden, "Forbidden")
+			return
+		}
+	}
+
+	if req.Method == http.MethodConnect {
+		handleHTTPS(conn, req, proxyHandler)
 	} else {
-		handlePlainHTTP(conn, req, pacparser)
+		handlePlainHTTP(conn, req, proxyHandler)
 	}
 }
 
-func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
+func handlePlainHTTP(client net.Conn, req *http.Request, proxyHandler *ProxyHandler) {
 	req.RequestURI = ""
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
 	trnprt := &http.Transport{
 		Proxy: func(r *http.Request) (*url.URL, error) {
-			proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
-			if err != nil {
-				log.Printf("PAC resolution error for %s: %v", r.Host, err)
-			} else if proxyURL != nil {
-				log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
-			} else {
-				log.Printf("%s accessed directly (DIRECT)", r.Host)
-			}
-			return proxyURL, err
+			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), proxyHandler.PacParser)
 		},
 	}
 
 	clientHTTP := &http.Client{
-		Timeout:   30 * time.Second,
+		Timeout:   300 * time.Second,
 		Transport: trnprt,
 	}
 
@@ -75,91 +90,23 @@ func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
 		statusCode, statusText, len(body), body)
 }
 
-func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
-	target := req.Host
-	proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("https:%s", req.URL))
-
+func handleHTTPS(client net.Conn, req *http.Request, proxyHandler *ProxyHandler) {
+	proxyURL, err := pac.HandleProxy(fmt.Sprintf("https:%s", req.URL), proxyHandler.PacParser)
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)
 		return
 	}
 
-	var server net.Conn
-	if proxyURL != nil {
-		server, err = net.DialTimeout("tcp", proxyURL.Host, time.Second*30)
-		if err != nil {
-			log.Println("Fail to connect to proxy for HTTPS:", err)
-			return
-		}
-
-		connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", target, target)
-		if _, err := server.Write([]byte(connectReq)); err != nil {
-			log.Println("Failed to write CONNECT to proxy:", err)
-			server.Close()
-			return
-		}
-
-		br := bufio.NewReader(server)
-		status, err := br.ReadString('\n')
-		if err != nil || !strings.Contains(status, "200") {
-			log.Printf("Proxy refused CONNECT: %s. Trying DIRECT!", status)
-
-			// --- Experimental support for wrong proxy configs
-			server.Close()
-			server, err = net.DialTimeout("tcp", target, time.Second*30)
-			if err != nil {
-				log.Println("DIRECT failed as well:", err)
-				return
-			}
-			log.Printf("%s was securely accessed directly (DIRECT)\n", target)
-
-			defer server.Close()
-
-			fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
-
-			done := make(chan struct{}, 2)
-			go func() {
-				io.Copy(server, client)
-				done <- struct{}{}
-			}()
-			go func() {
-				io.Copy(client, server)
-				done <- struct{}{}
-			}()
-			<-done
-
-			return
-
-			// --- Better to find a way thats easier to write this recover part
-		}
-
-		for {
-			line, err := br.ReadString('\n')
-			if err != nil || line == "\r\n" {
-				break
-			}
-		}
-		log.Printf("%s was securely accessed through proxy: %s\n", target, proxyURL)
-	} else {
-		server, err = net.DialTimeout("tcp", target, time.Second*30)
-		if err != nil {
-			log.Println("Fail to connect directly for HTTPS:", err)
-			return
-		}
-		defer server.Close()
-		log.Printf("%s was securely accessed directly (DIRECT)\n", target)
+	target := req.Host
+	if proxyURL == nil {
+		DoHTTPSDirectConnection(client, target)
+		return
 	}
 
-	fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
-
-	done := make(chan struct{}, 2)
-	go func() {
-		io.Copy(server, client)
-		done <- struct{}{}
-	}()
-	go func() {
-		io.Copy(client, server)
-		done <- struct{}{}
-	}()
-	<-done
+	if err := DoHTTPSProxyTunnel(client, proxyURL.Host, target); err != nil {
+		log.Println("Failed to connect to proxy for HTTPS:", err)
+		log.Println("Trying direct connection instead. If it works, means the proxy is not configured correctly...")
+		DoHTTPSDirectConnection(client, target)
+		return
+	}
 }

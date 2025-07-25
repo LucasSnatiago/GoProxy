@@ -21,7 +21,6 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	vmPool := sync.Pool{
 		New: func() any {
 			vm := new(gopac.Parser)
-
 			if err := vm.ParseBytes([]byte(pacScript)); err != nil {
 				return fmt.Errorf("failed to load PAC script: %v", err)
 			}
@@ -36,13 +35,13 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 }
 
 func DownloadPAC(ctx context.Context, pacURL string) (string, error) {
-	client := &http.Client{
-		Timeout: time.Second * 30,
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pacURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get pac %s: %w", pacURL, err)
+	}
+
+	client := &http.Client{
+		Timeout: time.Second * 300,
 	}
 
 	resp, err := client.Do(req)

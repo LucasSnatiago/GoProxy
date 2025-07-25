@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/LucasSnatiago/GoProxy/adblock"
 	"github.com/LucasSnatiago/GoProxy/pac"
 	"github.com/LucasSnatiago/GoProxy/proxyhandler"
 	"github.com/things-go/go-socks5"
@@ -25,6 +26,7 @@ func main() {
 	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
 	ttlSeconds := flag.Int64("S", 5*60, "sets how long (in seconds) for the cache to keep the entries - default is 5 minutes")
 	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
+	adblockEnabled := flag.Bool("a", false, "enable adblock usage on the proxy")
 	flag.Parse()
 
 	// Disabling log messages
@@ -39,9 +41,11 @@ func main() {
 	}
 
 	ctx := context.Background()
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*300)
+	defer cancel()
 
 	// Proxy Auto Config
-	pacScript, err := pac.DownloadPAC(ctx, *pacUrl)
+	pacScript, err := pac.DownloadPAC(ctxWithTimeout, *pacUrl)
 	if err != nil {
 		fmt.Println("Failed to parse PAC:", err)
 		os.Exit(2)
@@ -51,6 +55,17 @@ func main() {
 	if err != nil {
 		fmt.Println("Failed to create pac parser:", err)
 		os.Exit(3)
+	}
+
+	// Adblock
+	var adblocker *adblock.AdBlocker
+	if *adblockEnabled {
+		adblocker = adblock.NewAdblock(pacparser)
+		if adblocker == nil {
+			fmt.Println("AdBlock is disabled, something went wrong.")
+		} else {
+			log.Println("Adblock up and running")
+		}
 	}
 
 	httpAddr := net.JoinHostPort(*listenAddr, fmt.Sprint(*httpPort))
@@ -69,7 +84,7 @@ func main() {
 				continue
 			}
 
-			go proxyhandler.HandleHTTP(conn, pacparser)
+			go proxyhandler.HandleHTTPConnection(conn, pacparser, adblocker)
 		}
 	}()
 
@@ -78,7 +93,7 @@ func main() {
 	go func() {
 		server := socks5.NewServer(
 			socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags))),
-			socks5.WithDial(proxyhandler.HttpConnectDialer(httpAddr, time.Second*30)),
+			socks5.WithDial(proxyhandler.HttpConnectDialer(httpAddr, time.Second*300)),
 		)
 
 		fmt.Println("Proxy SOCKS5 listening on", socks5addr)
