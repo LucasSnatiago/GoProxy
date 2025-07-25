@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/LucasSnatiago/GoProxy/pac"
-	"github.com/LucasSnatiago/GoProxy/proxyhandler"
 )
 
 type AdBlocker struct {
@@ -22,23 +21,7 @@ func NewAdblock(pacparser *pac.Pac) *AdBlocker {
 	return adblock
 }
 
-func DownloadStevensBlackBlackList(pacparser *pac.Pac) *AdBlocker {
-	data, err := proxyhandler.GetBytesFromURL("https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts", pacparser)
-	if err != nil || len(data) == 0 {
-		log.Printf("Failed to download Stevens Black List: %v\nTurning adblock off", err)
-	}
-
-	entries, err := parseHostList(bufio.NewScanner(strings.NewReader(string(data))))
-	if err != nil || len(entries) == 0 {
-		log.Printf("Failed to parse Stevens Black List: %v\nTurning adblock off", err)
-	}
-
-	return &AdBlocker{
-		Entries: entries,
-	}
-}
-
-func parseHostList(scanner *bufio.Scanner) (map[string]string, error) {
+func ParseHostList(scanner *bufio.Scanner) (map[string]string, error) {
 	tmp := make(map[string]string)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -58,4 +41,9 @@ func parseHostList(scanner *bufio.Scanner) (map[string]string, error) {
 	}
 
 	return tmp, nil
+}
+
+func (a *AdBlocker) CheckIfAppearsOnAdblockList(host string) bool {
+	_, ok := a.Entries[host]
+	return ok
 }

@@ -60,9 +60,11 @@ func main() {
 	// Adblock
 	var adblocker *adblock.AdBlocker
 	if *adblockEnabled {
-		//adblocker = adblock.NewAdblock(pacparser)
+		adblocker = adblock.NewAdblock(pacparser)
 		if adblocker == nil {
 			fmt.Println("AdBlock is disabled, something went wrong.")
+		} else {
+			log.Println("Adblock up and running")
 		}
 	}
 
@@ -82,7 +84,7 @@ func main() {
 				continue
 			}
 
-			go proxyhandler.HandleHTTPConnection(conn, pacparser)
+			go proxyhandler.HandleHTTPConnection(conn, pacparser, adblocker)
 		}
 	}()
 
