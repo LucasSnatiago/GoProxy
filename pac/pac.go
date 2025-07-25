@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +21,6 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	vmPool := sync.Pool{
 		New: func() any {
 			vm := new(gopac.Parser)
-
 			if err := vm.ParseBytes([]byte(pacScript)); err != nil {
 				return fmt.Errorf("failed to load PAC script: %v", err)
 			}
@@ -38,13 +35,13 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 }
 
 func DownloadPAC(ctx context.Context, pacURL string) (string, error) {
-	client := &http.Client{
-		Timeout: time.Second * 30,
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pacURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get pac %s: %w", pacURL, err)
+	}
+
+	client := &http.Client{
+		Timeout: time.Second * 300,
 	}
 
 	resp, err := client.Do(req)
@@ -63,23 +60,4 @@ func DownloadPAC(ctx context.Context, pacURL string) (string, error) {
 	}
 
 	return string(data), nil
-}
-
-func (p *Pac) HttpHandleProxy(rawUrl string) (*url.URL, error) {
-	host := strings.Split(rawUrl, ":")[1]
-
-	// Cache logic
-	entry := p.getFromCache(rawUrl, host)
-
-	proxyFields := strings.Fields(entry)
-	switch strings.ToUpper(proxyFields[0]) {
-	case "PROXY":
-		return url.Parse("http://" + proxyFields[1])
-	case "SOCKS", "SOCKS5":
-		return url.Parse("socks5://" + proxyFields[1])
-	case "DIRECT":
-		return nil, nil // no proxy
-	default:
-		return nil, fmt.Errorf("unsupported proxy type: %s", proxyFields[0])
-	}
 }

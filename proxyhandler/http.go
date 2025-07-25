@@ -13,7 +13,7 @@ import (
 	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-func HandleHTTP(conn net.Conn, pacparser *pac.Pac) {
+func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -37,23 +37,12 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 
 	trnprt := &http.Transport{
 		Proxy: func(r *http.Request) (*url.URL, error) {
-			return pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", req.Host))
+			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), pacparser)
 		},
-		//Proxy: func(r *http.Request) (*url.URL, error) {
-		//	proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("http://%s", r.Host))
-		//	if err != nil {
-		//		log.Printf("PAC resolution error for %s: %v", r.Host, err)
-		//	} else if proxyURL != nil {
-		//		log.Printf("%s accessed through proxy: %s", r.Host, proxyURL.Host)
-		//	} else {
-		//		log.Printf("%s accessed directly (DIRECT)", r.Host)
-		//	}
-		//	return proxyURL, err
-		//},
 	}
 
 	clientHTTP := &http.Client{
-		Timeout:   30 * time.Second,
+		Timeout:   300 * time.Second,
 		Transport: trnprt,
 	}
 
@@ -78,7 +67,7 @@ func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
 }
 
 func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
-	proxyURL, err := pacparser.HttpHandleProxy(fmt.Sprintf("https:%s", req.URL))
+	proxyURL, err := pac.HandleProxy(fmt.Sprintf("https:%s", req.URL), pacparser)
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)
 		return
@@ -86,31 +75,39 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 
 	target := req.Host
 	if proxyURL == nil {
-		doDirectRequest(client, target)
+		DoDirectRequest(client, target)
 		return
 	}
 
-	server, err := doProxyRequest(proxyURL, target)
+	server, err := DoProxyRequest(proxyURL.Host, target)
 	if err != nil {
 		log.Println("Failed to connect to proxy for HTTPS:", err)
 		return
 	}
 	defer server.Close()
 
+	_ = readHTTPData(client, server, target)
+}
+
+func readHTTPData(client, server net.Conn, target string) []byte {
 	br := bufio.NewReader(server)
 	status, err := br.ReadString('\n')
 	if err != nil || !strings.Contains(status, "200") {
 		log.Printf("Proxy refused CONNECT: %s. Trying DIRECT!", status)
 
 		// --- Experimental support for wrong configured proxies
-		doDirectRequest(client, target)
-		return
+		DoDirectRequest(client, target)
+		return nil
 	}
 
+	var resp string
 	for {
 		line, err := br.ReadString('\n')
 		if err != nil || line == "\r\n" {
 			break
 		}
+		resp += line
 	}
+
+	return []byte(resp)
 }

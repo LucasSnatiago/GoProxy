@@ -5,12 +5,11 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/url"
 	"time"
 )
 
-func doProxyRequest(proxyURL *url.URL, target string) (net.Conn, error) {
-	server, err := net.DialTimeout("tcp", proxyURL.Host, time.Second*30)
+func DoProxyRequest(proxyURL string, target string) (net.Conn, error) {
+	server, err := net.DialTimeout("tcp", proxyURL, time.Second*300)
 	if err != nil {
 		log.Println("Fail to connect to proxy for HTTPS:", err)
 		return nil, fmt.Errorf("failed to connect to proxy: %w", err)
@@ -26,13 +25,13 @@ func doProxyRequest(proxyURL *url.URL, target string) (net.Conn, error) {
 	return server, nil
 }
 
-func doDirectRequest(client net.Conn, target string) {
-	server, err := net.DialTimeout("tcp", target, time.Second*30)
+func DoDirectRequest(client net.Conn, target string) {
+	server, err := net.DialTimeout("tcp", target, time.Second*300)
 	if err != nil {
 		log.Println("DIRECT failed:", err)
 		return
 	}
-	log.Printf("%s was securely accessed directly (DIRECT)\n", target)
+	log.Printf("DIRECT accessed %s\n", target)
 	defer server.Close()
 
 	fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
