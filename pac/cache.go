@@ -3,6 +3,7 @@ package pac
 import (
 	"log"
 	"net/url"
+	"strings"
 
 	"github.com/jackwakefield/gopac"
 )
@@ -15,7 +16,8 @@ func GetFromCache(rawUrl string, pac *Pac) string {
 		log.Println("failed to parse url: ", rawUrl)
 	}
 
-	target := url.Host
+	// Remove port if it exists
+	target := strings.Split(url.Host, ":")[0]
 	entry, ok := pac.PacCache.Get(target)
 	if !ok {
 		vm := pac.Get().(*gopac.Parser)
