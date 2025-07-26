@@ -12,11 +12,25 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
 
 builds:
-  - env:
+  - id: 'default set up'
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - '386'
+      - amd64
+      - arm
+      - arm64
+      - riscv64
+    goos:
+      - windows
+      - darwin
+    ldflags:
+      - -s -w -X main.BuildVersion={{ .Version }}
+
+  - id: 'unix performance setup'
+    env:
       - CGO_ENABLED=0
     goarch:
       - '386'
@@ -26,8 +40,6 @@ builds:
       - riscv64
     goos:
       - linux
-      - windows
-      - darwin
       - freebsd
     ldflags:
       - -s -w -X main.BuildVersion={{ .Version }}
@@ -43,7 +55,8 @@ archives:
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64.CPU_ISA.{{ .Amd64 }}
+      {{- if eq .Arch "amd64" }}x64
+      {{- if not (eq .Amd64 "v1") }}_{{ .Amd64 }}{{ end }}
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     # use zip for windows archives
