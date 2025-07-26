@@ -15,18 +15,8 @@ import (
 	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-type ProxyHandler struct {
-	PacParser *pac.Pac
-	Adblocker *adblock.AdBlocker
-}
-
 func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.AdBlocker) {
 	defer conn.Close()
-
-	proxyHandler := &ProxyHandler{
-		PacParser: pacparser,
-		Adblocker: adblock,
-	}
 
 	reader := bufio.NewReader(conn)
 	req, err := http.ReadRequest(reader)
@@ -37,10 +27,10 @@ func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.Ad
 		return
 	}
 
-	if proxyHandler.Adblocker != nil {
+	if adblock != nil {
 		// Drop connection if the host appears on the adblock list
 		host := strings.Split(req.Host, ":")
-		if proxyHandler.Adblocker.CheckIfAppearsOnAdblockList(host[0]) {
+		if adblock.CheckIfAppearsOnAdblockList(host[0]) {
 			log.Printf("Blocked request to %s due to adblock rules", req.Host)
 			writeHTTPError(conn, http.StatusForbidden, "Forbidden")
 			return
@@ -48,20 +38,20 @@ func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.Ad
 	}
 
 	if req.Method == http.MethodConnect {
-		handleHTTPS(conn, req, proxyHandler)
+		handleHTTPS(conn, req, pacparser)
 	} else {
-		handlePlainHTTP(conn, req, proxyHandler)
+		handlePlainHTTP(conn, req, pacparser)
 	}
 }
 
-func handlePlainHTTP(client net.Conn, req *http.Request, proxyHandler *ProxyHandler) {
+func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 	req.RequestURI = ""
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
 	trnprt := &http.Transport{
 		Proxy: func(r *http.Request) (*url.URL, error) {
-			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), proxyHandler.PacParser)
+			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), pacparser)
 		},
 	}
 
@@ -90,8 +80,8 @@ func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
 		statusCode, statusText, len(body), body)
 }
 
-func handleHTTPS(client net.Conn, req *http.Request, proxyHandler *ProxyHandler) {
-	proxyURL, err := pac.HandleProxy(fmt.Sprintf("https:%s", req.URL), proxyHandler.PacParser)
+func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
+	proxyURL, err := pac.HandleProxy(fmt.Sprintf("https:%s", req.URL), pacparser)
 	if err != nil {
 		log.Println("Failed to resolve proxy (HTTPS):", err)
 		return
