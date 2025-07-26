@@ -18,6 +18,8 @@ import (
 	"github.com/things-go/go-socks5"
 )
 
+var BuildVersion string
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	listenAddr := flag.String("l", "localhost", "ip to listen on")
@@ -27,7 +29,14 @@ func main() {
 	ttlSeconds := flag.Int64("S", 5*60, "sets how long (in seconds) for the cache to keep the entries - default is 5 minutes")
 	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
 	adblockEnabled := flag.Bool("a", false, "enable adblock usage on the proxy")
+	displayVersion := flag.Bool("version", false, "display GoProxy current version")
 	flag.Parse()
+
+	// Display version and exit
+	if *displayVersion {
+		fmt.Println("GoProxy version:", BuildVersion)
+		os.Exit(0)
+	}
 
 	// Disabling log messages
 	if !*logMessages {
