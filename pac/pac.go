@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LucasSnatiago/gopac"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/jackwakefield/gopac"
 )
 
 type Pac struct {

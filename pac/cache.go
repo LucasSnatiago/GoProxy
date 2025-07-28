@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/jackwakefield/gopac"
+	"github.com/LucasSnatiago/gopac"
 )
 
 // It tries to retrieve the URL from the cache if it fails it calls an OttoVM

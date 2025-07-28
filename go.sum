@@ -1,3 +1,5 @@
+github.com/LucasSnatiago/gopac v0.0.0-20250728195731-73250337d53a h1:ConeEWkk4tphcSNxsRYyWJF4qj5yBfeMVe7ul+qE7U0=
+github.com/LucasSnatiago/gopac v0.0.0-20250728195731-73250337d53a/go.mod h1:zU2iFyiB/ShZ+VL598nwr+PHs+K+j9JUtoRawOOxUts=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=

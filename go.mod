@@ -1,14 +1,14 @@
 module github.com/LucasSnatiago/GoProxy
 
-go 1.24.3
+go 1.24.5
 
 require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/jackwakefield/gopac v1.0.2
 	github.com/things-go/go-socks5 v0.0.6
 )
 
 require (
+	github.com/LucasSnatiago/gopac v0.0.0-20250728195731-73250337d53a // indirect
 	github.com/robertkrimen/otto v0.5.1 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
