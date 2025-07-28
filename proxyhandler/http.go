@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/LucasSnatiago/GoProxy/adblock"
@@ -29,8 +28,11 @@ func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.Ad
 
 	if adblock != nil {
 		// Drop connection if the host appears on the adblock list
-		host := strings.Split(req.Host, ":")
-		if adblock.CheckIfAppearsOnAdblockList(host[0]) {
+		host, _, err := net.SplitHostPort(req.Host)
+		if err != nil {
+			host = req.Host // If no port is specified, use the whole host
+		}
+		if adblock.CheckIfAppearsOnAdblockList(host) {
 			log.Printf("Blocked request to %s due to adblock rules", req.Host)
 			writeHTTPError(conn, http.StatusForbidden, "Forbidden")
 			return

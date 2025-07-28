@@ -2,8 +2,8 @@ package pac
 
 import (
 	"log"
+	"net"
 	"net/url"
-	"strings"
 
 	"github.com/LucasSnatiago/gopac"
 )
@@ -17,7 +17,11 @@ func GetFromCache(rawUrl string, pac *Pac) string {
 	}
 
 	// Remove port if it exists
-	target := strings.Split(url.Host, ":")[0]
+	target, _, err := net.SplitHostPort(url.Host)
+	if err != nil {
+		target = url.Host // If no port is specified, use the whole host
+	}
+
 	entry, ok := pac.PacCache.Get(target)
 	if !ok {
 		vm := pac.Get().(*gopac.Parser)
