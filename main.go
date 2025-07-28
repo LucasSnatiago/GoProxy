@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -49,12 +48,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*300)
-	defer cancel()
-
 	// Proxy Auto Config
-	pacScript, err := pac.DownloadPAC(ctxWithTimeout, *pacUrl)
+	pacScript, err := pac.DownloadPAC(*pacUrl)
 	if err != nil {
 		fmt.Println("Failed to parse PAC:", err)
 		os.Exit(2)

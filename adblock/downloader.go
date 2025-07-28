@@ -30,6 +30,16 @@ func DownloadStevensBlackBlackList(pacparser *pac.Pac) *AdBlocker {
 }
 
 func GetBytesFromURL(link string, p *pac.Pac) ([]byte, error) {
+	// Trying directly first
+	getReq, err := http.Get(link)
+	if err == nil {
+		defer getReq.Body.Close()
+		return io.ReadAll(getReq.Body)
+	}
+
+	// Retrying through proxy if direct request fails
+	log.Printf("Failed to get adblock directly. Trying through proxy")
+
 	rawProxyURL := pac.GetFromCache(link, p)
 	proxyUrl := strings.Split(rawProxyURL, " ")
 	proxyTarget, err := url.Parse(fmt.Sprintf("http://%s", proxyUrl[1]))
@@ -38,21 +48,12 @@ func GetBytesFromURL(link string, p *pac.Pac) ([]byte, error) {
 		return nil, err
 	}
 
-	proxy := http.ProxyURL(proxyTarget)
-	transport := &http.Transport{
-		Proxy: proxy,
-	}
 	client := &http.Client{
-		Transport: transport,
+		Transport: &http.Transport{Proxy: http.ProxyURL(proxyTarget)},
 		Timeout:   300 * time.Second,
 	}
 
-	req, err := http.NewRequest(http.MethodGet, link, nil)
-	if err != nil {
-		log.Printf("Failed to create request for %s: %v", link, err)
-		return nil, err
-	}
-	resp, err := client.Do(req)
+	resp, err := client.Get(link)
 	if err != nil {
 		log.Printf("Failed to download %s: %v", link, err)
 		return nil, err
