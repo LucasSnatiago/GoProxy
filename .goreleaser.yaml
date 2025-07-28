@@ -10,7 +10,6 @@ version: 2
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
 
 builds:
@@ -18,11 +17,9 @@ builds:
     env:
       - CGO_ENABLED=0
     goarch:
-      - '386'
       - amd64
       - arm
       - arm64
-      - riscv64
     goos:
       - windows
       - darwin
@@ -33,7 +30,6 @@ builds:
     env:
       - CGO_ENABLED=0
     goarch:
-      - '386'
       - amd64
       - arm
       - arm64
