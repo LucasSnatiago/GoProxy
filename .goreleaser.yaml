@@ -23,8 +23,6 @@ builds:
     goos:
       - windows
       - darwin
-    ldflags:
-      - -s -w
 
   - id: 'unix performance setup'
     env:
@@ -36,9 +34,6 @@ builds:
       - riscv64
     goos:
       - linux
-      - freebsd
-    ldflags:
-      - -s -w
     goamd64:
       - v1
       - v2
