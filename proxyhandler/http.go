@@ -26,17 +26,14 @@ func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.Ad
 		return
 	}
 
-	if adblock != nil {
-		// Drop connection if the host appears on the adblock list
-		host, _, err := net.SplitHostPort(req.Host)
-		if err != nil {
-			host = req.Host // If no port is specified, use the whole host
-		}
-		if adblock.CheckIfAppearsOnAdblockList(host) {
-			log.Printf("Blocked request to %s due to adblock rules", req.Host)
-			writeHTTPError(conn, http.StatusForbidden, "Forbidden")
-			return
-		}
+	if shouldBlockAds(req, adblock) {
+		writeHTTPError(conn, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	// Add the proxy authentication if provided
+	if pacparser.Auth != nil {
+		req.SetBasicAuth(pacparser.Auth.User, pacparser.Auth.Password)
 	}
 
 	if req.Method == http.MethodConnect {
@@ -101,4 +98,19 @@ func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 		DoHTTPSDirectConnection(client, target)
 		return
 	}
+}
+
+func shouldBlockAds(req *http.Request, adblocker *adblock.AdBlocker) bool {
+	if adblocker != nil {
+		// Drop connection if the host appears on the adblock list
+		host, _, err := net.SplitHostPort(req.Host)
+		if err != nil {
+			host = req.Host // If no port is specified, use the whole host
+		}
+		if adblocker.CheckIfAppearsOnAdblockList(host) {
+			log.Printf("Blocked request to %s due to adblock rules", req.Host)
+			return true
+		}
+	}
+	return false
 }

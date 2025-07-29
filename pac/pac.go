@@ -9,10 +9,12 @@ import (
 
 	"github.com/LucasSnatiago/gopac"
 	"github.com/hashicorp/golang-lru/v2/expirable"
+	"golang.org/x/net/proxy"
 )
 
 type Pac struct {
 	PacCache *expirable.LRU[string, string]
+	Auth     *proxy.Auth // Optional authentication for the PAC script
 	*sync.Pool
 }
 
@@ -29,6 +31,7 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 
 	return &Pac{
 		PacCache: expirable.NewLRU[string, string](1000000, nil, ttl), // Caching the million most recent visited sites
+		Auth:     nil,                                                 // No authentication by default
 		Pool:     &vmPool,
 	}, nil
 }
@@ -50,4 +53,13 @@ func DownloadPAC(pacURL string) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func (pac *Pac) SetAuth(username, password string) {
+	if username != "" && password != "" {
+		pac.Auth = &proxy.Auth{
+			User:     username,
+			Password: password,
+		}
+	}
 }

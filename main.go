@@ -21,10 +21,12 @@ var BuildVersion string
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
 	listenAddr := flag.String("l", "localhost", "ip to listen on")
 	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
 	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
-	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
+	username := flag.String("user", "", "username for authentication")
+	password := flag.String("pass", "", "password for authentication")
 	ttlSeconds := flag.Int64("S", 5*60, "sets how long (in seconds) for the cache to keep the entries - default is 5 minutes")
 	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
 	adblockEnabled := flag.Bool("a", false, "enable adblock usage on the proxy")
@@ -60,6 +62,7 @@ func main() {
 		fmt.Println("Failed to create pac parser:", err)
 		os.Exit(3)
 	}
+	pacparser.SetAuth(*username, *password)
 
 	// Adblock
 	var adblocker *adblock.AdBlocker
@@ -79,8 +82,8 @@ func main() {
 		os.Exit(4)
 	}
 
-	fmt.Println("Proxy HTTP listening on", httpAddr)
 	go func() {
+		fmt.Println("Proxy HTTP listening on", httpAddr)
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
@@ -93,8 +96,8 @@ func main() {
 	}()
 
 	// Socks5
-	socks5addr := net.JoinHostPort(*listenAddr, fmt.Sprint(*socksPort))
 	go func() {
+		socks5addr := net.JoinHostPort(*listenAddr, fmt.Sprint(*socksPort))
 		server := socks5.NewServer(
 			socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags))),
 			socks5.WithDial(proxyhandler.HttpConnectDialer(httpAddr, time.Second*300)),

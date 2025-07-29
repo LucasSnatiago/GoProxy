@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+type Credentials struct {
+	username string
+	password string
+}
+
 // Get network package from socks and transform it in a http proxy package
 func HttpConnectDialer(proxyHTTPAddr string, dialTimeout time.Duration) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	d := &net.Dialer{
@@ -47,5 +52,12 @@ func HttpConnectDialer(proxyHTTPAddr string, dialTimeout time.Duration) func(ctx
 		conn.SetDeadline(time.Time{})
 		log.Printf("HTTP CONNECT tunnel established to %s via %s", addr, proxyHTTPAddr)
 		return conn, nil
+	}
+}
+
+func NewCredentials(username, password string) *Credentials {
+	return &Credentials{
+		username: username,
+		password: password,
 	}
 }
