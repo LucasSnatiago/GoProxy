@@ -17,8 +17,6 @@ import (
 	"github.com/things-go/go-socks5"
 )
 
-var BuildVersion string
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
@@ -35,7 +33,7 @@ func main() {
 
 	// Display version and exit
 	if *displayVersion {
-		fmt.Println("GoProxy version:", BuildVersion)
+		fmt.Println(DisplayVersion())
 		os.Exit(0)
 	}
 
