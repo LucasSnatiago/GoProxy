@@ -4,18 +4,18 @@ GoProxy is a fast, configurable HTTP/HTTPS and SOCKS5 proxy written in Go. It su
 
 ## Features
 
-- **HTTP/HTTPS Proxy** (including `CONNECT` for TLS/TCP tunneling)  
+- **HTTP/HTTPS Proxy** (including `CONNECT` for TLS/TCP tunneling)
 - **SOCKS5 Proxy** via [go-socks5](https://github.com/things-go/go-socks5)
-- **PAC/WPAD Support** via [gopac](https://github.com/jackwakefield/gopac)  
-- Honors `PROXY`, `SOCKS5` and `DIRECT` directives in your PAC file  
-- Per-request logging: method, target host, and chosen upstream proxy  
-- Efficient bidirectional tunneling with `io.Copy` and zero-copy splice  
-- Simple CLI flags for configuration  
+- **PAC/WPAD Support** via [gopac](https://github.com/jackwakefield/gopac)
+- Honors `PROXY`, `SOCKS5` and `DIRECT` directives in your PAC file
+- Per-request logging: method, target host, and chosen upstream proxy
+- Efficient bidirectional tunneling with `io.Copy` and zero-copy splice
+- Simple CLI flags for configuration
 - Easy extension points for HTTP caching, ad-blocking, pprof metrics, etc.
 
 ## Requirements
 
-- Go 1.18+  
+- Go 1.18+
 - Network access to your PAC/WPAD URL
 
 ## Installation
@@ -23,7 +23,7 @@ GoProxy is a fast, configurable HTTP/HTTPS and SOCKS5 proxy written in Go. It su
 ```bash
 git clone https://github.com/LucasSnatiago/GoProxy.git
 cd GoProxy
-go build -o goproxy
+go build -o GoProxy
 ```
 
 Or just go to the [release section](https://github.com/LucasSnatiago/GoProxy/releases/)
@@ -31,7 +31,7 @@ Or just go to the [release section](https://github.com/LucasSnatiago/GoProxy/rel
 # Usage
 
 ```bash
-./goproxy -C http://example.com/pacfile
+./goproxy
 ```
 
 # License

@@ -19,7 +19,7 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
-	pacUrl := flag.String("C", "", "Proxy Auto Configuration URL")
+	pacUrl := flag.String("C", "http://wpad/wpad.dat", "Proxy Auto Configuration URL")
 	listenAddr := flag.String("l", "localhost", "ip to listen on")
 	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
 	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
@@ -97,7 +97,7 @@ func main() {
 	go func() {
 		socks5addr := net.JoinHostPort(*listenAddr, fmt.Sprint(*socksPort))
 		server := socks5.NewServer(
-			socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags))),
+			socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags|log.Lshortfile|log.Lmicroseconds))),
 			socks5.WithDial(proxyhandler.HttpConnectDialer(httpAddr, time.Second*300)),
 		)
 
