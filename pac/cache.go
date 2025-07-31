@@ -51,7 +51,7 @@ func GetFromCache(rawUrl string, pac *Pac) string {
 }
 
 func startCacheStatsLogger() {
-	ticker := time.NewTicker(time.Minute / 10)
+	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for range ticker.C {
 			hits := atomic.LoadUint64(&cacheHits)
