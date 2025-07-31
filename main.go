@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -62,6 +63,8 @@ func main() {
 	}
 	pacparser.SetAuth(*username, *password)
 
+	fmt.Println("Running GoProxy version:", version)
+
 	// Adblock
 	var adblocker *adblock.AdBlocker
 	if *adblockEnabled {
@@ -74,24 +77,19 @@ func main() {
 	}
 
 	httpAddr := net.JoinHostPort(*listenAddr, fmt.Sprint(*httpPort))
-	ln, err := net.Listen("tcp", httpAddr)
+
+	// Proxy HTTP
+	fmt.Println("Proxy HTTP listening on", httpAddr)
+	go func() {
+		err = http.ListenAndServe(httpAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			proxyhandler.HandleHTTPConnection(w, r, pacparser, adblocker)
+		}))
+	}()
+	// If fail to start HTTP server, exit
 	if err != nil {
 		fmt.Println("Failed to start http proxy:", err)
 		os.Exit(4)
 	}
-
-	go func() {
-		fmt.Println("Proxy HTTP listening on", httpAddr)
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				log.Println("Failed to accept new connection:", err)
-				continue
-			}
-
-			go proxyhandler.HandleHTTPConnection(conn, pacparser, adblocker)
-		}
-	}()
 
 	// Socks5
 	go func() {

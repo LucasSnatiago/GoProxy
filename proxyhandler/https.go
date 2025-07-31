@@ -5,10 +5,11 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"time"
 )
 
-func DoHTTPSProxyTunnel(client net.Conn, proxyURL string, target string) error {
+func DoHTTPSProxyTunnel(w http.ResponseWriter, r *http.Request, proxyURL string, target string) error {
 	server, err := net.DialTimeout("tcp", proxyURL, time.Second*300)
 	if err != nil {
 		log.Println("Fail to connect to proxy for HTTPS:", err)
@@ -23,11 +24,25 @@ func DoHTTPSProxyTunnel(client net.Conn, proxyURL string, target string) error {
 		return fmt.Errorf("failed to write CONNECT request: %w", err)
 	}
 
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return fmt.Errorf("hijacking not supported")
+	}
+
+	client, bufrw, err := hj.Hijack()
+	if err != nil {
+		log.Println("Failed to hijack connection:", err)
+		return fmt.Errorf("failed to hijack connection: %w", err)
+	}
+	defer client.Close()
+
+	go io.Copy(server, bufrw.Reader)
 	exchangeData(client, server)
 	return nil
 }
 
-func DoHTTPSDirectConnection(client net.Conn, target string) {
+func DoHTTPSDirectConnection(w http.ResponseWriter, r *http.Request, target string) {
 	server, err := net.DialTimeout("tcp", target, time.Second*300)
 	if err != nil {
 		log.Println("DIRECT failed:", err)
@@ -36,7 +51,22 @@ func DoHTTPSDirectConnection(client net.Conn, target string) {
 	log.Printf("DIRECT accessed %s\n", target)
 	defer server.Close()
 
-	fmt.Fprintf(client, "HTTP/1.1 200 Connection Established\r\n\r\n")
+	w.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return
+	}
+
+	client, bufrw, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer client.Close()
+
+	go io.Copy(server, bufrw.Reader)
 	exchangeData(client, server)
 }
 
