@@ -68,27 +68,6 @@ func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pa
 	}
 }
 
-func handleHTTPS(w http.ResponseWriter, req *http.Request, pacparser *pac.Pac) {
-	proxyURL, err := pac.HandleProxy(fmt.Sprintf("https:%s", req.URL), pacparser)
-	if err != nil {
-		log.Println("Failed to resolve proxy (HTTPS):", err)
-		return
-	}
-
-	target := req.Host
-	if proxyURL == nil {
-		DoHTTPSDirectConnection(w, req, target)
-		return
-	}
-
-	if err := DoHTTPSProxyTunnel(w, req, proxyURL.Host, target); err != nil {
-		log.Println("Failed to connect to proxy for HTTPS:", err)
-		log.Println("Trying direct connection instead. If it works, means the proxy is not configured correctly...")
-		DoHTTPSDirectConnection(w, req, target)
-		return
-	}
-}
-
 func shouldBlockAds(req *http.Request, adblocker *adblock.AdBlocker) bool {
 	if adblocker != nil {
 		// Drop connection if the host appears on the adblock list
