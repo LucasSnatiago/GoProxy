@@ -1,6 +1,7 @@
 package proxyhandler
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -60,8 +61,7 @@ func DoHTTPSProxyTunnel(w http.ResponseWriter, r *http.Request, proxyURL string,
 	}
 	defer client.Close()
 
-	go io.Copy(server, bufrw.Reader)
-	exchangeData(client, server)
+	exchangeData(client, server, bufrw)
 	return nil
 }
 
@@ -89,11 +89,15 @@ func DoHTTPSDirectConnection(w http.ResponseWriter, r *http.Request, target stri
 	}
 	defer client.Close()
 
-	go io.Copy(server, bufrw.Reader)
-	exchangeData(client, server)
+	exchangeData(client, server, bufrw)
 }
 
-func exchangeData(client, server net.Conn) {
+func exchangeData(client, server net.Conn, bufrw *bufio.ReadWriter) {
+	// Write the buffered data to the server
+	go io.Copy(server, bufrw.Reader)
+
+	// Keep the HTTP+TLS connection alive by copying data between client and server
+	// until one of them closes the connection.
 	done := make(chan struct{}, 2)
 	go func() {
 		io.Copy(server, client)
