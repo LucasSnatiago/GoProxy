@@ -41,6 +41,9 @@ func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pa
 		Proxy: func(r *http.Request) (*url.URL, error) {
 			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), pacparser)
 		},
+		ForceAttemptHTTP2:  true,
+		DisableCompression: true,
+		DisableKeepAlives:  false,
 	}
 
 	clientHTTP := &http.Client{
@@ -57,13 +60,16 @@ func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pa
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf("Failed to read response body for %s: %v", req.URL, err)))
-		return
+	// Copy all headers from the response
+	for key, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
 	}
-	if _, err := w.Write(body); err != nil {
+
+	w.WriteHeader(resp.StatusCode)
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
 		log.Printf("Failed to write response for %s: %v", req.URL, err)
 	}
 }
