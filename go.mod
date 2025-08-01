@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/elazarl/goproxy v1.7.2 // indirect
 	github.com/robertkrimen/otto v0.5.1 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
