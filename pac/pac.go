@@ -13,9 +13,10 @@ import (
 )
 
 type Pac struct {
-	PacCache *expirable.LRU[string, string]
-	Auth     *proxy.Auth // Optional authentication for the PAC script
-	*sync.Pool
+	PacCache      *expirable.LRU[string, string] // Cache for PAC entries
+	Auth          *proxy.Auth                    // Optional authentication for the PAC script
+	*sync.RWMutex                                // Mutex to protect access to the pool
+	*sync.Pool                                   // Pool of gopac.Parser instances
 }
 
 func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {

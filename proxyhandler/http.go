@@ -41,7 +41,6 @@ func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pa
 		Proxy: func(r *http.Request) (*url.URL, error) {
 			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), pacparser)
 		},
-		ForceAttemptHTTP2:  true,
 		DisableCompression: true,
 		DisableKeepAlives:  false,
 	}
