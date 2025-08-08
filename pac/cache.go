@@ -56,7 +56,9 @@ func startCacheStatsLogger() {
 		for range ticker.C {
 			hits := atomic.LoadUint64(&cacheHits)
 			misses := atomic.LoadUint64(&cacheMisses)
-			log.Printf("Cache hits: %d, misses: %d | %d%% of cache hits\n", hits, misses, hits*100/(hits+misses))
+			if hits != 0 {
+				log.Printf("Cache hits: %v, misses: %v | %v%% of cache hits\n", hits, misses, hits*100/(hits+misses))
+			}
 		}
 	}()
 }

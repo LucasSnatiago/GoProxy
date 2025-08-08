@@ -31,6 +31,8 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	}
 
 	// Start metrics for cache hits and misses
+	cacheHits = 0
+	cacheMisses = 0
 	startCacheStatsLogger()
 	return &Pac{
 		PacCache: expirable.NewLRU[string, string](1000000, nil, ttl), // Caching the million most recent visited sites
