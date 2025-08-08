@@ -13,9 +13,10 @@ import (
 )
 
 type Pac struct {
-	PacCache *expirable.LRU[string, string]
-	Auth     *proxy.Auth // Optional authentication for the PAC script
-	*sync.Pool
+	PacCache      *expirable.LRU[string, string] // Cache for PAC entries
+	Auth          *proxy.Auth                    // Optional authentication for the PAC script
+	*sync.RWMutex                                // Mutex to protect access to the pool
+	*sync.Pool                                   // Pool of gopac.Parser instances
 }
 
 func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
@@ -29,6 +30,10 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 		},
 	}
 
+	// Start metrics for cache hits and misses
+	cacheHits = 0
+	cacheMisses = 0
+	startCacheStatsLogger()
 	return &Pac{
 		PacCache: expirable.NewLRU[string, string](1000000, nil, ttl), // Caching the million most recent visited sites
 		Auth:     nil,                                                 // No authentication by default

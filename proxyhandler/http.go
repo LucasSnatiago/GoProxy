@@ -1,7 +1,6 @@
 package proxyhandler
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -14,36 +13,26 @@ import (
 	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-func HandleHTTPConnection(conn net.Conn, pacparser *pac.Pac, adblock *adblock.AdBlocker) {
-	defer conn.Close()
-
-	reader := bufio.NewReader(conn)
-	req, err := http.ReadRequest(reader)
-	if err != nil {
-		if err != io.EOF {
-			log.Println("Fail to read request:", err)
-		}
-		return
-	}
-
-	if shouldBlockAds(req, adblock) {
-		writeHTTPError(conn, http.StatusForbidden, "Forbidden")
+func HandleHTTPConnection(w http.ResponseWriter, r *http.Request, pacparser *pac.Pac, adblock *adblock.AdBlocker) {
+	if shouldBlockAds(r, adblock) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Forbidden"))
 		return
 	}
 
 	// Add the proxy authentication if provided
 	if pacparser.Auth != nil {
-		req.SetBasicAuth(pacparser.Auth.User, pacparser.Auth.Password)
+		r.SetBasicAuth(pacparser.Auth.User, pacparser.Auth.Password)
 	}
 
-	if req.Method == http.MethodConnect {
-		handleHTTPS(conn, req, pacparser)
+	if r.Method == http.MethodConnect {
+		handleHTTPS(w, r, pacparser)
 	} else {
-		handlePlainHTTP(conn, req, pacparser)
+		handlePlainHTTP(w, r, pacparser)
 	}
 }
 
-func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
+func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pac) {
 	req.RequestURI = ""
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
@@ -52,6 +41,8 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 		Proxy: func(r *http.Request) (*url.URL, error) {
 			return pac.HandleProxy(fmt.Sprintf("http://%s", r.Host), pacparser)
 		},
+		DisableCompression: true,
+		DisableKeepAlives:  false,
 	}
 
 	clientHTTP := &http.Client{
@@ -62,41 +53,23 @@ func handlePlainHTTP(client net.Conn, req *http.Request, pacparser *pac.Pac) {
 	resp, err := clientHTTP.Do(req)
 	if err != nil {
 		log.Printf("Failed to send request to %s: %v", req.URL, err)
-		writeHTTPError(client, http.StatusBadGateway, "Bad Gateway")
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write([]byte("Bad Gateway"))
 		return
 	}
 	defer resp.Body.Close()
 
-	if err := resp.Write(client); err != nil {
+	// Copy all headers from the response
+	for key, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+
+	w.WriteHeader(resp.StatusCode)
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
 		log.Printf("Failed to write response for %s: %v", req.URL, err)
-	}
-}
-
-func writeHTTPError(conn net.Conn, statusCode int, statusText string) {
-	body := fmt.Sprintf("%d %s", statusCode, statusText)
-	fmt.Fprintf(conn,
-		"HTTP/1.1 %d %s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
-		statusCode, statusText, len(body), body)
-}
-
-func handleHTTPS(client net.Conn, req *http.Request, pacparser *pac.Pac) {
-	proxyURL, err := pac.HandleProxy(fmt.Sprintf("https:%s", req.URL), pacparser)
-	if err != nil {
-		log.Println("Failed to resolve proxy (HTTPS):", err)
-		return
-	}
-
-	target := req.Host
-	if proxyURL == nil {
-		DoHTTPSDirectConnection(client, target)
-		return
-	}
-
-	if err := DoHTTPSProxyTunnel(client, proxyURL.Host, target); err != nil {
-		log.Println("Failed to connect to proxy for HTTPS:", err)
-		log.Println("Trying direct connection instead. If it works, means the proxy is not configured correctly...")
-		DoHTTPSDirectConnection(client, target)
-		return
 	}
 }
 
