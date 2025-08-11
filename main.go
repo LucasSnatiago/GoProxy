@@ -105,7 +105,7 @@ func main() {
 			}
 		}
 
-		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", *listenAddr, *osHttpPort), proxy))
+		log.Fatal(http.ListenAndServe(net.JoinHostPort(*listenAddr, fmt.Sprint(*osHttpPort)), proxy))
 	}()
 
 	// Socks5
