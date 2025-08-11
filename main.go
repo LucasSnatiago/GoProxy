@@ -80,19 +80,6 @@ func main() {
 
 	httpAddr := net.JoinHostPort(*listenAddr, fmt.Sprint(*httpPort))
 
-	// Proxy HTTP for Browsers
-	fmt.Println("Proxy HTTP for browsers listening on", httpAddr)
-	go func() {
-		err = http.ListenAndServe(httpAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			proxyhandler.HandleHTTPConnection(w, r, pacparser, adblocker)
-		}))
-	}()
-	// If fail to start HTTP server, exit
-	if err != nil {
-		fmt.Println("Failed to start http proxy:", err)
-		os.Exit(4)
-	}
-
 	// Proxy HTTPS for OS
 	fmt.Println("Proxy HTTPS for your operational system listening on", net.JoinHostPort(*listenAddr, fmt.Sprint(*osHttpPort)))
 	go func() {
@@ -105,8 +92,21 @@ func main() {
 			}
 		}
 
-		log.Fatal(http.ListenAndServe(net.JoinHostPort(*listenAddr, fmt.Sprint(*osHttpPort)), proxy))
+		log.Fatal(http.ListenAndServe(httpAddr, proxy))
 	}()
+
+	// Proxy HTTP for Browsers
+	fmt.Println("Proxy HTTP for browsers listening on", httpAddr)
+	go func() {
+		err = http.ListenAndServe(httpAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			proxyhandler.HandleHTTPConnection(w, r, pacparser, adblocker)
+		}))
+	}()
+	// If fail to start HTTP server, exit
+	if err != nil {
+		fmt.Println("Failed to start http proxy:", err)
+		os.Exit(4)
+	}
 
 	// Socks5
 	go func() {
