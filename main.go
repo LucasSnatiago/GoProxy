@@ -15,6 +15,7 @@ import (
 	"github.com/LucasSnatiago/GoProxy/adblock"
 	"github.com/LucasSnatiago/GoProxy/pac"
 	"github.com/LucasSnatiago/GoProxy/proxyhandler"
+	"github.com/elazarl/goproxy"
 	"github.com/things-go/go-socks5"
 )
 
@@ -23,6 +24,7 @@ func main() {
 	pacUrl := flag.String("C", "http://wpad/wpad.dat", "Proxy Auto Configuration URL")
 	listenAddr := flag.String("l", "localhost", "ip to listen on")
 	httpPort := flag.Int("p", 3128, "HTTP/HTTPS port to listen on")
+	osHttpPort := flag.Int("P", 3129, "HTTP port to listen on for OS (ex.: Windows)")
 	socksPort := flag.Int("s", 8010, "SOCKS5 port to listen on")
 	username := flag.String("user", "", "username for authentication")
 	password := flag.String("pass", "", "password for authentication")
@@ -78,8 +80,8 @@ func main() {
 
 	httpAddr := net.JoinHostPort(*listenAddr, fmt.Sprint(*httpPort))
 
-	// Proxy HTTP
-	fmt.Println("Proxy HTTP listening on", httpAddr)
+	// Proxy HTTP for Browsers
+	fmt.Println("Proxy HTTP for browsers listening on", httpAddr)
 	go func() {
 		err = http.ListenAndServe(httpAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			proxyhandler.HandleHTTPConnection(w, r, pacparser, adblocker)
@@ -90,6 +92,21 @@ func main() {
 		fmt.Println("Failed to start http proxy:", err)
 		os.Exit(4)
 	}
+
+	// Proxy HTTPS for OS
+	fmt.Println("Proxy HTTPS for your operational system listening on", net.JoinHostPort(*listenAddr, fmt.Sprint(*osHttpPort)))
+	go func() {
+		proxy := goproxy.NewProxyHttpServer()
+		proxy.Verbose = true
+
+		if *adblockEnabled {
+			for _, filter := range adblocker.Entries {
+				proxy.OnRequest(goproxy.UrlIs(filter)).HandleConnect(goproxy.AlwaysReject)
+			}
+		}
+
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", *listenAddr, *osHttpPort), proxy))
+	}()
 
 	// Socks5
 	go func() {
