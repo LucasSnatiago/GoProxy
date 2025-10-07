@@ -14,7 +14,7 @@ import (
 )
 
 func HandleHTTPConnection(w http.ResponseWriter, r *http.Request, pacparser *pac.Pac, adblock *adblock.AdBlocker) {
-	if shouldBlockAds(r, adblock) {
+	if adblock != nil && shouldBlockAds(r, adblock) {
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Forbidden"))
 		return
@@ -77,16 +77,15 @@ func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pa
 }
 
 func shouldBlockAds(req *http.Request, adblocker *adblock.AdBlocker) bool {
-	if adblocker != nil {
-		// Drop connection if the host appears on the adblock list
-		host, _, err := net.SplitHostPort(req.Host)
-		if err != nil {
-			host = req.Host // If no port is specified, use the whole host
-		}
-		if adblocker.CheckIfAppearsOnAdblockList(host) {
-			log.Printf("Blocked request to %s due to adblock rules", req.Host)
-			return true
-		}
+	// Drop connection if the host appears on the adblock list
+	host, _, err := net.SplitHostPort(req.Host)
+	if err != nil {
+		host = req.Host // If no port is specified, use the whole host
+	}
+
+	if adblocker.CheckIfAppearsOnAdblockList(host) {
+		log.Printf("Blocked request to %s due to adblock rules", req.Host)
+		return true
 	}
 	return false
 }
