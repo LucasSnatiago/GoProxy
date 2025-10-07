@@ -43,6 +43,9 @@ func handlePlainHTTP(w http.ResponseWriter, req *http.Request, pacparser *pac.Pa
 		},
 		DisableCompression: true,
 		DisableKeepAlives:  false,
+		ForceAttemptHTTP2:  false,
+		MaxIdleConns:       200,
+		MaxConnsPerHost:    200,
 	}
 
 	clientHTTP := &http.Client{
