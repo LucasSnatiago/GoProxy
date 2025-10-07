@@ -13,7 +13,7 @@ before:
     - go mod tidy
 
 builds:
-  - id: 'default set up'
+  - id: 'windows and macos'
     env:
       - CGO_ENABLED=0
     goarch:
@@ -27,6 +27,7 @@ builds:
   - id: 'unix performance setup'
     env:
       - CGO_ENABLED=0
+      - GOEXPERIMENT=greenteagc
     goarch:
       - amd64
       - arm
