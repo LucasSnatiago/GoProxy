@@ -27,7 +27,6 @@ builds:
   - id: 'unix performance setup'
     env:
       - CGO_ENABLED=0
-      - GOEXPERIMENT=greenteagc
     goarch:
       - amd64
       - arm
