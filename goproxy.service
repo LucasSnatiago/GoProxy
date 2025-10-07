@@ -5,9 +5,10 @@ After=network-online.target NetworkManager-wait-online.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/GoProxy 
+ExecStart=/usr/local/bin/GoProxy
 Restart=on-failure
 RestartSec=5s
+User=goproxy
 
 [Install]
 WantedBy=multi-user.target
