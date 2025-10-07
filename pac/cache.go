@@ -1,6 +1,7 @@
 package pac
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/url"
@@ -27,6 +28,12 @@ func GetFromCache(rawUrl string, pac *Pac) string {
 	target, _, err := net.SplitHostPort(url.Host)
 	if err != nil {
 		target = url.Host // If no port is specified, use the whole host
+	}
+
+	// Check if its an IP address and skip the cache
+	ip := net.ParseIP(target)
+	if ip != nil {
+		return fmt.Sprintf("DIRECT %s", target)
 	}
 
 	entry, ok := pac.PacCache.Get(target)
