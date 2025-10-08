@@ -18,18 +18,17 @@ builds:
       - CGO_ENABLED=0
     goarch:
       - amd64
-      - arm
       - arm64
     goos:
       - windows
       - darwin
+      - freebsd
 
   - id: 'unix performance setup'
     env:
       - CGO_ENABLED=0
     goarch:
       - amd64
-      - arm
       - arm64
       - riscv64
     goos:
