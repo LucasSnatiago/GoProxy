@@ -14,7 +14,7 @@ import (
 )
 
 func DownloadStevensBlackBlackList(pacparser *pac.Pac) *AdBlocker {
-	data, err := GetBytesFromURL("https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts", pacparser)
+	data, err := GetBytesFromURL("https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn/hosts", pacparser)
 	if err != nil || len(data) == 0 {
 		log.Printf("Failed to download Stevens Black List: %v\nTurning adblock off", err)
 	}
