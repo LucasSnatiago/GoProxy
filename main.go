@@ -28,6 +28,7 @@ func main() {
 	password := flag.String("pass", "", "password for authentication")
 	ttlSeconds := flag.Int64("S", 5*60, "sets how long (in seconds) for the cache to keep the entries - default is 5 minutes")
 	logMessages := flag.Bool("v", false, "if you set this flag it will enable console output for every request")
+	adblockLink := flag.String("A", "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn/hosts", "adblock list to be used")
 	adblockEnabled := flag.Bool("a", false, "enable adblock usage on the proxy")
 	displayVersion := flag.Bool("version", false, "display GoProxy current version")
 	flag.Parse()
@@ -67,8 +68,8 @@ func main() {
 
 	// Adblock
 	var adblocker *adblock.AdBlocker
-	if *adblockEnabled {
-		adblocker = adblock.NewAdblock(pacparser)
+	if *adblockEnabled && adblockLink != nil && *adblockLink != "" {
+		adblocker = adblock.NewAdblock(*adblockLink, pacparser)
 		if adblocker == nil {
 			fmt.Println("AdBlock is disabled, something went wrong.")
 		} else {

@@ -13,8 +13,8 @@ type AdBlocker struct {
 	Entries []string
 }
 
-func NewAdblock(pacparser *pac.Pac) *AdBlocker {
-	adblock := DownloadStevensBlackBlackList(pacparser)
+func NewAdblock(adblockUrl string, pacparser *pac.Pac) *AdBlocker {
+	adblock := DownloadStevensBlackBlackList(adblockUrl, pacparser)
 	if len(adblock.Entries) == 0 {
 		log.Println("AdBlock is disabled, no entries found.")
 	}

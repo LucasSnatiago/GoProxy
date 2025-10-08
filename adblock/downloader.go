@@ -13,8 +13,8 @@ import (
 	"github.com/LucasSnatiago/GoProxy/pac"
 )
 
-func DownloadStevensBlackBlackList(pacparser *pac.Pac) *AdBlocker {
-	data, err := GetBytesFromURL("https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn/hosts", pacparser)
+func DownloadStevensBlackBlackList(adblockUrl string, pacparser *pac.Pac) *AdBlocker {
+	data, err := GetBytesFromURL(adblockUrl, pacparser)
 	if err != nil || len(data) == 0 {
 		log.Printf("Failed to download Stevens Black List: %v\nTurning adblock off", err)
 	}
