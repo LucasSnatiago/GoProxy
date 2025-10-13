@@ -15,6 +15,8 @@ import (
 type Pac struct {
 	PacCache      *expirable.LRU[string, string] // Cache for PAC entries
 	Auth          *proxy.Auth                    // Optional authentication for the PAC script
+	pacScript     string                         // The PAC script content
+	ttlDuration   time.Duration                  // Duration for which the PAC entries are cached
 	*sync.RWMutex                                // Mutex to protect access to the pool
 	*sync.Pool                                   // Pool of gopac.Parser instances
 }
@@ -35,10 +37,25 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	cacheMisses = 0
 	startCacheStatsLogger()
 	return &Pac{
-		PacCache: expirable.NewLRU[string, string](1000000, nil, ttl), // Caching the million most recent visited sites
-		Auth:     nil,                                                 // No authentication by default
-		Pool:     &vmPool,
+		PacCache:    expirable.NewLRU[string, string](1000000, nil, ttl), // Caching the million most recent visited sites
+		Auth:        nil,                                                 // No authentication by default
+		pacScript:   pacScript,
+		ttlDuration: ttl,
+		Pool:        &vmPool,
 	}, nil
+}
+
+func (pac *Pac) Reload() error {
+	newPac, err := NewPac(pac.pacScript, pac.ttlDuration)
+	if err != nil {
+		return fmt.Errorf("failed to reload PAC: %v", err)
+	}
+
+	pac.PacCache = newPac.PacCache
+	pac.Auth = newPac.Auth
+	pac.ttlDuration = newPac.ttlDuration
+	pac.Pool = newPac.Pool
+	return nil
 }
 
 func DownloadPAC(pacURL string) (string, error) {

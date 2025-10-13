@@ -69,3 +69,11 @@ func startCacheStatsLogger() {
 		}
 	}()
 }
+
+func CacheHits() uint64 {
+	return atomic.LoadUint64(&cacheHits)
+}
+
+func CacheMisses() uint64 {
+	return atomic.LoadUint64(&cacheMisses)
+}
