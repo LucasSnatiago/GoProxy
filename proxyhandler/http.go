@@ -21,7 +21,7 @@ func HandleHTTPConnection(w http.ResponseWriter, r *http.Request, pacparser *pac
 	}
 
 	if r.URL.Host == "goproxy" {
-		handleLocalSettings(w, r, pacparser)
+		handleLocalSettings(w, r, pacparser, adblock)
 		return
 	}
 

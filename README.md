@@ -12,6 +12,7 @@ GoProxy is a fast, configurable HTTP/HTTPS and SOCKS5 proxy written in Go. It su
 - Efficient bidirectional tunneling with `io.Copy` and zero-copy splice
 - Simple CLI flags for configuration
 - Easy extension points for HTTP caching, ad-blocking, pprof metrics, etc.
+- Easy runtime statistics and administration during runtime. Available at `http://goproxy/help`
 
 ## Requirements
 

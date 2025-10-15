@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +29,11 @@ func GetFromCache(rawUrl string, pac *Pac) string {
 	target, _, err := net.SplitHostPort(url.Host)
 	if err != nil {
 		target = url.Host // If no port is specified, use the whole host
+	}
+
+	// Do not cache empty targets
+	if strings.TrimSpace(target) == "" {
+		return "DIRECT"
 	}
 
 	// Check if its an IP address and skip the cache
