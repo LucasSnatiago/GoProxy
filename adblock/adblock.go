@@ -2,6 +2,7 @@ package adblock
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"slices"
 	"strings"
@@ -10,7 +11,8 @@ import (
 )
 
 type AdBlocker struct {
-	Entries []string
+	Entries        []string
+	cachedToString string
 }
 
 func NewAdblock(adblockUrl string, pacparser *pac.Pac) *AdBlocker {
@@ -45,4 +47,18 @@ func ParseHostList(scanner *bufio.Scanner) ([]string, error) {
 
 func (a *AdBlocker) CheckIfAppearsOnAdblockList(host string) bool {
 	return slices.Contains(a.Entries, host)
+}
+
+func (a *AdBlocker) ToString() string {
+	if a.cachedToString != "" {
+		return a.cachedToString
+	}
+
+	str := fmt.Sprintf("%d entries:\n", len(a.Entries))
+	for _, entry := range a.Entries {
+		str += entry + "\n"
+	}
+	a.cachedToString = str
+
+	return str
 }

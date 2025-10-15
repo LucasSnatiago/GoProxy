@@ -20,6 +20,11 @@ func HandleHTTPConnection(w http.ResponseWriter, r *http.Request, pacparser *pac
 		return
 	}
 
+	if r.URL.Host == "goproxy" {
+		handleLocalSettings(w, r, pacparser, adblock)
+		return
+	}
+
 	// Add the proxy authentication if provided
 	if pacparser.Auth != nil {
 		r.SetBasicAuth(pacparser.Auth.User, pacparser.Auth.Password)

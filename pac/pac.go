@@ -1,9 +1,11 @@
 package pac
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -15,6 +17,8 @@ import (
 type Pac struct {
 	PacCache      *expirable.LRU[string, string] // Cache for PAC entries
 	Auth          *proxy.Auth                    // Optional authentication for the PAC script
+	pacScript     string                         // The PAC script content
+	ttlDuration   time.Duration                  // Duration for which the PAC entries are cached
 	*sync.RWMutex                                // Mutex to protect access to the pool
 	*sync.Pool                                   // Pool of gopac.Parser instances
 }
@@ -35,10 +39,25 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	cacheMisses = 0
 	startCacheStatsLogger()
 	return &Pac{
-		PacCache: expirable.NewLRU[string, string](1000000, nil, ttl), // Caching the million most recent visited sites
-		Auth:     nil,                                                 // No authentication by default
-		Pool:     &vmPool,
+		PacCache:    expirable.NewLRU[string, string](1000, nil, ttl*100), // Caching a thousand most recent visited sites
+		Auth:        nil,                                                  // No authentication by default
+		pacScript:   pacScript,
+		ttlDuration: ttl,
+		Pool:        &vmPool,
 	}, nil
+}
+
+func (pac *Pac) Reload() error {
+	newPac, err := NewPac(pac.pacScript, pac.ttlDuration)
+	if err != nil {
+		return fmt.Errorf("failed to reload PAC: %v", err)
+	}
+
+	pac.PacCache = newPac.PacCache
+	pac.Auth = newPac.Auth
+	pac.ttlDuration = newPac.ttlDuration
+	pac.Pool = newPac.Pool
+	return nil
 }
 
 func DownloadPAC(pacURL string) (string, error) {
@@ -67,4 +86,22 @@ func (pac *Pac) SetAuth(username, password string) {
 			Password: password,
 		}
 	}
+}
+
+func (p *Pac) PacCacheToString() (string, error) {
+	keys := append([]string(nil), p.PacCache.Keys()...)
+	sort.Strings(keys)
+
+	out := make(map[string]any, len(keys))
+	for _, k := range keys {
+		if v, ok := p.PacCache.Get(k); ok {
+			out[k] = v
+		}
+	}
+
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
