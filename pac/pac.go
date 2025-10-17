@@ -39,8 +39,8 @@ func NewPac(pacScript string, ttl time.Duration) (*Pac, error) {
 	cacheMisses = 0
 	startCacheStatsLogger()
 	return &Pac{
-		PacCache:    expirable.NewLRU[string, string](1000, nil, ttl*100), // Caching a thousand most recent visited sites
-		Auth:        nil,                                                  // No authentication by default
+		PacCache:    expirable.NewLRU[string, string](1000, nil, ttl), // Caching a thousand most recent visited sites
+		Auth:        nil,                                              // No authentication by default
 		pacScript:   pacScript,
 		ttlDuration: ttl,
 		Pool:        &vmPool,
