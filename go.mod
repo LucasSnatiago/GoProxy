@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/LucasSnatiago/gopac v0.0.0-20250728195731-73250337d53a
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/things-go/go-socks5 v0.1.0
+	github.com/things-go/go-socks5 v0.1.1
 	golang.org/x/net v0.52.0
 )
 
