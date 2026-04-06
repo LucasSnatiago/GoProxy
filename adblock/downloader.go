@@ -20,7 +20,7 @@ func DownloadStevensBlackBlackList(adblockUrl string, pacparser *pac.Pac) *AdBlo
 	}
 
 	entries, err := ParseHostList(bufio.NewScanner(strings.NewReader(string(data))))
-	if err != nil || len(entries) == 0 {
+	if err != nil || entries.Len() == 0 {
 		log.Printf("Failed to parse Stevens Black List: %v\nTurning adblock off", err)
 	}
 

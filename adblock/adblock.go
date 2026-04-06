@@ -4,28 +4,30 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"slices"
 	"strings"
 
 	"github.com/LucasSnatiago/GoProxy/pac"
+	iradix "github.com/hashicorp/go-immutable-radix/v2"
 )
 
 type AdBlocker struct {
-	Entries        []string
+	Entries        *iradix.Tree[bool]
 	cachedToString string
 }
 
 func NewAdblock(adblockUrl string, pacparser *pac.Pac) *AdBlocker {
 	adblock := DownloadStevensBlackBlackList(adblockUrl, pacparser)
-	if len(adblock.Entries) == 0 {
+	if adblock.Entries.Len() == 0 {
 		log.Println("AdBlock is disabled, no entries found.")
 	}
 
 	return adblock
 }
 
-func ParseHostList(scanner *bufio.Scanner) ([]string, error) {
-	var tmp []string
+func ParseHostList(scanner *bufio.Scanner) (*iradix.Tree[bool], error) {
+	r := iradix.New[bool]()
+	txn := r.Txn()
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "#") || len(strings.TrimSpace(line)) == 0 {
@@ -36,17 +38,19 @@ func ParseHostList(scanner *bufio.Scanner) ([]string, error) {
 		if len(fields) < 2 {
 			continue
 		}
-		tmp = append(tmp, fields[1])
+		txn.Insert([]byte(fields[1]), true)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	return tmp, nil
+	r = txn.Commit()
+	return r, nil
 }
 
 func (a *AdBlocker) CheckIfAppearsOnAdblockList(host string) bool {
-	return slices.Contains(a.Entries, host)
+	_, found := a.Entries.Get([]byte(host))
+	return found
 }
 
 func (a *AdBlocker) ToString() string {
@@ -54,11 +58,12 @@ func (a *AdBlocker) ToString() string {
 		return a.cachedToString
 	}
 
-	str := fmt.Sprintf("%d entries:\n", len(a.Entries))
-	for _, entry := range a.Entries {
-		str += entry + "\n"
+	str := strings.Builder{}
+	str.WriteString(fmt.Sprintf("%d entries:\n", a.Entries.Len()))
+	for host, _ := range a.Entries.Root().Walk {
+		str.WriteString(fmt.Sprintf("%s\n", host))
 	}
-	a.cachedToString = str
+	a.cachedToString = str.String()
 
-	return str
+	return a.cachedToString
 }
