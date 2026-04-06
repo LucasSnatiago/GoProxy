@@ -13,11 +13,11 @@ func TestNewAdblock(t *testing.T) {
 		t.Error("Expected NewAdblock to return a valid object")
 	}
 
-	if _, found := adblocker.Entries.Get([]byte("ad-assets.futurecdn.net")); !found {
+	if !adblocker.CheckIfAppearsOnAdblockList("ad-assets.futurecdn.net") {
 		t.Errorf("Expected to find this entry")
 	}
 
-	if _, found := adblocker.Entries.Get([]byte("google.com")); found {
+	if adblocker.CheckIfAppearsOnAdblockList("google.com") {
 		t.Errorf("Expected to not find this entry")
 	}
 }
